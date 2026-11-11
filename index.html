@@ -1,0 +1,1419 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The Option Machine</title>
+<meta name="description" content="A proposal plan for integrating AI into OMA's practice. SBLD 560 Designing with AI, SCAD, Fall 2026.">
+<style>
+:root{
+  --ink:#0b0b0b; --paper:#ffffff; --red:#e4002b; --grey:#f1f0ed; --line:#0b0b0b22; --mute:#5c5c5c;
+  --sans:"Helvetica Neue",Helvetica,Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans)}
+body{min-height:100vh}
+button{font:inherit;cursor:pointer;border:2px solid var(--ink);background:var(--paper);color:var(--ink);padding:10px 18px;text-transform:uppercase;letter-spacing:.06em;font-weight:700;font-size:13px}
+button:hover{background:var(--ink);color:var(--paper)}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid var(--red);outline-offset:3px}
+button[disabled]{opacity:.3;cursor:default;background:var(--paper);color:var(--ink)}
+.eyebrow{font-size:11px;letter-spacing:.16em;text-transform:uppercase;font-weight:700}
+.todo{background:var(--red);color:#fff;padding:1px 6px;font-size:.82em;font-weight:700;letter-spacing:.04em;white-space:nowrap}
+.write{border-left:4px solid var(--red);padding-left:10px;color:var(--mute);font-style:italic}
+
+/* ---------- top bar ---------- */
+.bar{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 24px;border-bottom:2px solid var(--ink);font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:700}
+.bar nav{display:flex;gap:6px;flex-wrap:wrap}
+.bar nav button{padding:5px 9px;font-size:10px;border-width:1.5px}
+.bar nav button.on{background:var(--ink);color:#fff}
+
+/* ---------- machine (home) ---------- */
+#home{max-width:1280px;margin:0 auto;padding:20px 24px 40px}
+.hero{display:grid;grid-template-columns:1.4fr 1fr;gap:24px;align-items:end;margin:10px 0 18px}
+.stage,.hud,.skip{max-width:calc(64vh * 1200 / 700);margin-left:auto;margin-right:auto}
+.hero h1{font-size:clamp(44px,6.4vw,96px);line-height:.84;letter-spacing:-.05em;margin:0;font-weight:900;text-transform:uppercase}
+.hero h1 span{color:var(--red)}
+.hero p{font-size:15px;line-height:1.5;margin:0 0 6px}
+.stage{position:relative;border:2px solid var(--ink);background:
+  linear-gradient(var(--line) 1px,transparent 1px) 0 0/40px 40px,
+  linear-gradient(90deg,var(--line) 1px,transparent 1px) 0 0/40px 40px,var(--paper)}
+#machine{display:block;width:100%;touch-action:none}
+.hud{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin-top:12px}
+.hud .help{font-size:13px;max-width:560px;line-height:1.45}
+.meter{display:flex;gap:4px;align-items:flex-end;height:34px}
+.meter i{display:block;width:9px;background:var(--grey);border:1.5px solid var(--ink);transition:background .05s}
+.meter i.on{background:var(--red)}
+#punch{background:var(--red);color:#fff;border-color:var(--red);padding:12px 22px;font-size:14px}
+#punch:hover{background:var(--ink);border-color:var(--ink)}
+.skip{margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12px}
+.skip button{font-size:11px;padding:7px 11px;border-width:1.5px}
+.toast{position:absolute;left:50%;top:18px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 14px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+
+/* ---------- booklet ---------- */
+#book{display:none;max-width:1280px;margin:0 auto;padding:22px 24px 30px}
+.book-wrap{perspective:2200px;position:relative;cursor:grab;touch-action:pan-y}
+.book-wrap.grabbing{cursor:grabbing;user-select:none}
+.book-wrap.grabbing *{user-select:none}
+/* the turning leaf */
+.flipper{position:absolute;inset:0;z-index:6;perspective:2600px;pointer-events:none}
+.flipper .half{position:absolute;top:0;bottom:0;width:50%;border:0!important}
+.flipper .half.l{left:0}.flipper .half.r{right:0}
+.leaf{position:absolute;top:0;bottom:0;width:50%;transform-style:preserve-3d;will-change:transform}
+.leaf.r{left:50%;transform-origin:left center}
+.leaf.l{left:0;transform-origin:right center}
+.face{position:absolute!important;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border:0!important;box-shadow:0 0 30px #0000001f}
+.flipper .pg:not(.inkbg):not(.redbg){background:var(--paper)}
+.face.back{transform:rotateY(180deg)}
+.shade{position:absolute;inset:0;pointer-events:none;opacity:0;background:linear-gradient(90deg,#0000 0%,#0000 40%,#00000066 100%)}
+.leaf.r .face.front .shade{background:linear-gradient(90deg,#00000066,#0000 60%)}
+.leaf.l .face.front .shade{background:linear-gradient(270deg,#00000066,#0000 60%)}
+.leaf.r .face.back .shade{background:linear-gradient(270deg,#00000055,#0000 60%)}
+.leaf.l .face.back .shade{background:linear-gradient(90deg,#00000055,#0000 60%)}
+/* folded corners you can grab */
+.corner{position:absolute;bottom:0;width:44px;height:44px;z-index:4;cursor:grab;transition:width .2s,height .2s}
+.corner.r{right:0;background:linear-gradient(315deg,#fff 0 50%,#e8e6e1 50%)}
+.corner.l{left:0;background:linear-gradient(45deg,#fff 0 50%,#e8e6e1 50%)}
+.corner::after{content:"";position:absolute;inset:0}
+.corner.r::after{background:linear-gradient(315deg,transparent calc(50% - 1px),var(--red) calc(50% - 1px) calc(50% + 1px),transparent calc(50% + 1px))}
+.corner.l::after{background:linear-gradient(45deg,transparent calc(50% - 1px),var(--red) calc(50% - 1px) calc(50% + 1px),transparent calc(50% + 1px))}
+.corner:hover{width:70px;height:70px}
+.corner.off{display:none}
+.corner.r{animation:peek 3.2s ease-in-out 1.2s 2}
+@keyframes peek{0%,80%,100%{width:44px;height:44px}88%{width:72px;height:72px}}
+.drag-hint{font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--mute)}
+@media(max-width:860px){.corner{display:none}}
+.spread{display:none;grid-template-columns:1fr 1fr;min-height:min(72vh,720px);border:2px solid var(--ink);background:var(--paper);position:relative;transform-origin:center left}
+.spread.active{display:grid}
+.spread::after{content:"";position:absolute;top:0;bottom:0;left:50%;width:28px;margin-left:-14px;background:linear-gradient(90deg,transparent,#0000000f 45%,#0000001a 50%,#0000000f 55%,transparent);pointer-events:none}
+.spread.full::after{display:none}
+.spread.full{grid-template-columns:1fr}
+.pg{padding:34px 38px;display:flex;flex-direction:column;gap:14px;position:relative;overflow:hidden}
+.pg + .pg{border-left:1px solid var(--line)}
+.pg h2{font-size:clamp(34px,4.4vw,64px);line-height:.9;letter-spacing:-.045em;margin:0;font-weight:900;text-transform:uppercase}
+.pg h3{font-size:13px;letter-spacing:.12em;text-transform:uppercase;margin:6px 0 0}
+.pg p,.pg li{font-size:15px;line-height:1.5;margin:0}
+.pg ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px}
+.folio{margin-top:auto;font-size:10px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;display:flex;justify-content:space-between}
+.pg img,.pg video{width:100%;display:block;object-fit:cover;border:1.5px solid var(--ink)}
+.cap{font-size:11px;color:var(--mute);line-height:1.4}
+.wl{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.wl div{border-top:4px solid var(--ink);padding-top:8px}
+.wl .loss{border-color:var(--red)}
+.wl > div > b{display:block;font-size:11px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:4px}
+.meta{display:flex;gap:8px;flex-wrap:wrap}
+.meta span{border:1.5px solid var(--ink);padding:3px 8px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.meta span.r{background:var(--red);border-color:var(--red);color:#fff}
+.stamp{display:inline-block;border:3px solid var(--red);color:var(--red);font-weight:900;letter-spacing:.1em;padding:2px 8px;transform:rotate(-6deg);font-size:13px}
+.stamp.drop{border-color:var(--ink);color:var(--ink)}
+.pg .big,.big{font-size:clamp(56px,8.5vw,130px);line-height:.82;font-weight:900;letter-spacing:-.06em;margin:0}
+.pg img{max-height:min(58vh,560px)}
+.pg:has(img + img) img,.pg:has(.grid3) > img{max-height:min(30vh,300px)}
+.grid3 img{max-height:120px!important}
+.redbg{background:var(--red);color:#fff}
+.redbg .folio,.redbg .cap{color:#fff}
+.inkbg{background:var(--ink);color:#fff}
+.inkbg .cap{color:#bbb}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.list7 li{display:grid;grid-template-columns:38px 1fr auto;gap:8px;align-items:center;border-bottom:1px solid var(--line);padding:8px 0;list-style:none}
+.list7{padding:0}
+.list7 li b{font-size:18px}
+.list7 li{padding:6px 0!important}
+.list7 .t{display:flex;flex-direction:column;gap:2px}
+.list7 .t small{font-size:11.5px;line-height:1.35;color:var(--mute)}
+.list7 .stamp{font-size:11px}
+.debate{border:2px solid var(--ink);padding:10px 12px;display:flex;flex-direction:column;gap:6px;background:var(--grey)}
+.debate h3{margin:0}
+.pg .debate p{font-size:12.5px;line-height:1.45}
+.stamp.stamp-tr{position:absolute;top:22px;right:30px;font-size:12px;white-space:nowrap}
+.roots{border-top:3px solid var(--ink);padding-top:8px}
+.roots h3{margin:0 0 4px}
+.roots table{font-size:11.5px}
+.roots td{border:0;border-bottom:1px solid var(--line);text-align:left;padding:4px 6px 4px 0;vertical-align:top}
+.roots td:first-child{white-space:nowrap;font-weight:700}
+.tally{display:flex;gap:22px;margin:6px 0 4px}
+.tally div{display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+.tally .n{font-size:clamp(56px,7vw,96px);font-weight:900;line-height:.85;letter-spacing:-.05em}
+.list7 li button{all:unset;cursor:pointer;font-weight:700;text-decoration:underline;text-underline-offset:3px}
+.motion{border-top:2px solid var(--ink);padding-top:8px}
+.motion q{font-weight:700;display:block;margin-bottom:4px}
+
+/* toggle */
+.tog{display:flex;gap:6px;flex-wrap:wrap}
+.tog button{font-size:11px;padding:6px 10px;border-width:1.5px}
+.tog button.on{background:var(--red);border-color:var(--red);color:#fff}
+.togimg{position:relative}
+/* lens reveal: drag a circle to see the render through the Rhino model */
+.lens{position:relative;overflow:hidden;border:1.5px solid var(--ink);user-select:none;touch-action:none;cursor:none;margin:0 auto;width:100%;background:var(--grey)}
+.lens.wide{aspect-ratio:1424/736}
+.lens.tall{aspect-ratio:auto;flex:0 0 auto;height:min(30vh,300px);width:calc(min(30vh,300px) * 736 / 1024);margin:0}
+.pg .lens img{position:absolute;inset:0;width:100%;height:100%;max-height:none!important;object-fit:cover;border:0}
+.lens .after{clip-path:circle(var(--rp,90px) at var(--x,50%) var(--y,50%));transition:clip-path .45s cubic-bezier(.2,.8,.2,1)}
+.lens.dragging .after{transition:none}
+.lens .ring{position:absolute;left:var(--x,50%);top:var(--y,50%);width:calc(var(--rp,90px) * 2);height:calc(var(--rp,90px) * 2);transform:translate(-50%,-50%);border:3px solid var(--red);border-radius:50%;pointer-events:none;transition:opacity .3s}
+.lens.all .ring{opacity:0}
+.lens .lab{position:absolute;top:8px;left:8px;background:var(--ink);color:#fff;font-size:10px;letter-spacing:.12em;padding:3px 7px;font-weight:700;pointer-events:none}
+.lens .lab.r{left:auto;right:8px;background:var(--red)}
+@media(max-width:860px){.pg.coverimg{min-height:min(110vw,520px)}}
+.covercap{position:absolute;left:16px;bottom:16px;background:var(--ink);color:#fff;font:700 10px/1.3 var(--sans);letter-spacing:.12em;text-transform:uppercase;padding:6px 9px}
+/* ---------- figure-ground stage matrix ---------- */
+.pg h2.h2s{font-size:clamp(30px,3.6vw,52px)}
+.mx{display:grid;grid-template-columns:1fr 260px;gap:16px;align-items:stretch}
+.mxscroll{overflow-x:auto}
+.pgrid{display:grid;grid-template-columns:128px repeat(6,minmax(84px,1fr));gap:6px;background:var(--ink);padding:6px;min-width:660px}
+.pgrid .hd{all:unset;cursor:pointer;background:var(--ink);color:#fff;display:flex;align-items:flex-end;padding:6px 3px 4px;font-size:9.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+.pgrid .hd.on{color:var(--red)}
+.pgrid .hd:focus-visible{outline:3px solid var(--red)}
+.pgrid .rl{all:unset;cursor:pointer;position:relative;overflow:hidden;background:repeating-linear-gradient(45deg,#1c1c1c 0 6px,#262626 6px 12px);color:#fff;display:flex;align-items:flex-end}
+.pgrid .rl img,.pgrid .rl video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border:0;max-height:none!important;transition:transform .5s}
+.pgrid .rl:hover img,.pgrid .rl.on img,.pgrid .rl:hover video,.pgrid .rl.on video{transform:scale(1.08)}
+.pgrid .rl b{position:relative;background:#0b0b0bd9;font:800 8.5px/1.1 var(--sans);text-transform:uppercase;letter-spacing:.06em;padding:2px 5px;margin:0 0 4px 4px;width:auto;white-space:nowrap}
+.pgrid .rl.on b{background:var(--red)}
+.pgrid .rl:focus-visible{outline:3px solid var(--red);outline-offset:-3px}
+.pc{all:unset;cursor:pointer;aspect-ratio:1.9;perspective:600px;display:block}
+.pc:focus-visible{outline:3px solid var(--red);outline-offset:-3px}
+.pc .fl{display:block;position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .55s cubic-bezier(.3,.7,.2,1)}
+.pc.flip .fl{transform:rotateY(180deg)}
+.pc .fr,.pc .bk{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;display:grid;place-items:center}
+.pc .bk{transform:rotateY(180deg);padding:6px;text-align:center;font:700 10px/1.25 var(--sans);color:#fff}
+.pc.core .fr{background:#fff}
+.pc.core .fr i{height:66%;width:auto;aspect-ratio:1;background:var(--ink);display:grid;grid-template-columns:1fr 1fr;gap:18%;padding:24%;box-sizing:border-box}
+.pc.core .fr i s{display:block;background:#fff;text-decoration:none}
+.pc.pilot .fr{background:#fff}
+.pc.pilot .fr i{width:40%;aspect-ratio:1;background:var(--ink);transform:rotate(45deg);display:grid;place-items:center}
+.pc.pilot .fr i::after{content:"";width:34%;aspect-ratio:1;background:#fff}
+.pc.none .fr{background:var(--ink)}
+.pc.none .fr i{width:22%;height:2px;background:#ffffff26}
+.pc.core .bk{background:var(--red)}
+.pc.pilot .bk{background:repeating-linear-gradient(45deg,#e4002b 0 6px,#b8001f 6px 12px)}
+.pc.none .bk{background:#2a2a2a;color:#aaa}
+.pc .bk em{display:block;font-style:normal;font-size:8.5px;letter-spacing:.12em;text-transform:uppercase;opacity:.85;margin-bottom:3px}
+.pc.col{filter:brightness(1)}
+.pgrid.focuscol .pc:not(.col),.pgrid.focusrow .pc:not(.row){opacity:.35;transition:opacity .25s}
+.pgrid .pc{transition:opacity .25s}
+.pc.slide .fl{animation:rowslide .7s cubic-bezier(.3,.7,.2,1) both;animation-delay:var(--d,0s)}
+@keyframes rowslide{0%{transform:translateX(-30px) rotate(-8deg);opacity:0}100%{transform:none;opacity:1}}
+.pc.flip.slide .fl{animation:none}
+.mxpanel{border:2px solid var(--ink);padding:14px;display:flex;flex-direction:column;gap:8px;font-size:13px;line-height:1.45}
+.mxpanel h3{margin:0;font-size:20px;letter-spacing:-.02em;text-transform:uppercase;line-height:1}
+.mxpanel .k{font-size:10px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--mute)}
+.mxpanel .chips{display:flex;flex-wrap:wrap;gap:4px}
+.mxpanel .chips span{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border:1.5px solid var(--ink);padding:2px 6px}
+.mxpanel .chips span.c{background:var(--red);border-color:var(--red);color:#fff}
+.mxpanel .chips span.p{background:repeating-linear-gradient(45deg,#fff 0 4px,#e4002b44 4px 8px)}
+.mxlegend{display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-top:-4px}
+.mxlegend span{display:flex;align-items:center;gap:6px}
+.lg{width:18px;height:14px;display:inline-block;border:1.5px solid var(--ink);position:relative}
+.lg.core{background:#fff}.lg.core::after{content:"";position:absolute;inset:3px 5px;background:var(--ink)}
+.lg.pilot{background:#fff}.lg.pilot::after{content:"";position:absolute;left:5px;top:3px;width:6px;height:6px;background:var(--ink);transform:rotate(45deg)}
+.lg.none{background:var(--ink)}
+@media(max-width:860px){.mx{grid-template-columns:1fr}}
+/* LoRA strength slider */
+.strength{display:flex;flex-direction:column;gap:8px}
+.sframe{position:relative;aspect-ratio:2/3;height:min(52vh,480px);margin:0 auto;border:1.5px solid var(--ink);overflow:hidden;background:#fff}
+.pg .sframe img{position:absolute;inset:0;width:100%;height:100%;max-height:none!important;object-fit:cover;border:0;opacity:0;transition:opacity .25s}
+.pg .sframe img.on{opacity:1}
+.sval{position:absolute;left:8px;top:8px;background:var(--red);color:#fff;font:900 13px/1 var(--sans);letter-spacing:.06em;padding:5px 8px;text-transform:uppercase}
+.sbar{display:flex;gap:10px;align-items:center;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+.sbar input{flex:1;accent-color:var(--red)}
+.sbar span{display:none}
+.sticks{display:flex;justify-content:space-between;font-size:10px;font-weight:700;color:var(--mute);margin-top:-4px}
+.sticks span.on{color:var(--red)}
+@media(max-width:860px){.sframe{height:auto;width:100%}}
+.pg video.clip{max-height:min(24vh,250px);object-fit:contain;background:#000}
+/* diagram -> model morph (scrubbable like a video) */
+.morph{display:flex;flex-direction:column;gap:6px;outline-offset:4px}
+.mframe{position:relative;aspect-ratio:4/3;max-height:min(30vh,280px);border:1.5px solid var(--ink);overflow:hidden;background:#fff;cursor:ew-resize;touch-action:pan-y;margin:0 auto;width:100%}
+.pg .mframe img{position:absolute;inset:0;width:100%;height:100%;max-height:none!important;object-fit:cover;border:0;opacity:0;will-change:opacity,filter,transform}
+/* 3D program blocks */
+.m3d{position:absolute;inset:0;perspective:900px;perspective-origin:50% 40%;background:#fff;z-index:0}
+.mframe img{z-index:1}
+.scene{position:absolute;left:50%;top:54%;width:0;height:0;transform-style:preserve-3d}
+.box{position:absolute;left:0;top:0;transform-style:preserve-3d}
+.bf{position:absolute;display:flex;align-items:center;justify-content:center;overflow:hidden;border:1px solid #00000059;backface-visibility:visible}
+.bf b{font:900 10px/1 var(--sans);letter-spacing:-.02em;color:#00000070;text-transform:uppercase;white-space:nowrap;pointer-events:none}
+.bf i{position:absolute;inset:0;background:#f4f4f1;opacity:var(--w,0)}
+.bf.s1{filter:brightness(.88)}.bf.s2{filter:brightness(.76)}.bf.top{filter:brightness(1.06)}
+.mtc{position:absolute;right:6px;bottom:6px;background:var(--ink);color:#fff;font:700 10px/1 var(--sans);letter-spacing:.1em;padding:4px 6px}
+.mbar{display:flex;gap:8px;align-items:center}
+.mbar .mplay{width:34px;height:30px;padding:0;font-size:12px;background:var(--red);border-color:var(--red);color:#fff}
+.mbar input{flex:1;accent-color:var(--red)}
+.mstages{display:flex;justify-content:space-between}
+.mstages button{all:unset;cursor:pointer;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);padding:2px 0}
+.mstages button.on{color:var(--red)}
+.lensrow{display:flex;gap:12px;align-items:flex-end}
+.lensrow .cap{flex:1;min-width:0;margin:0}
+@media(max-width:860px){.lensrow{flex-direction:column;align-items:stretch}.lensrow .lens.tall{margin:0 auto}}
+/* matrix */
+table{border-collapse:collapse;width:100%;font-size:12px}
+th,td{border:1px solid var(--ink);padding:6px 5px;text-align:center}
+th{font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;background:var(--grey)}
+td:first-child,th:first-child{text-align:left;font-weight:700}
+td.c{background:var(--red);color:#fff;font-weight:900}
+td.p{background:repeating-linear-gradient(45deg,#fff 0 5px,#e4002b33 5px 10px);font-weight:700}
+.phase{border:2px solid var(--ink);padding:14px}
+.phase h3{margin:0 0 6px}
+/* calculator */
+.calc label{display:grid;grid-template-columns:1fr 110px;gap:8px;align-items:center;font-size:13px;padding:6px 0;border-bottom:1px solid var(--line)}
+.calc input{font:inherit;font-weight:700;padding:6px 8px;border:1.5px solid var(--ink);width:100%;text-align:right}
+.out{font-size:clamp(40px,6vw,84px);font-weight:900;letter-spacing:-.04em;line-height:.9}
+.seg{display:flex;border:2px solid var(--ink);width:max-content}
+.seg button{border:0;padding:7px 12px;font-size:11px}
+.seg button.on{background:var(--ink);color:#fff}
+.bars div{display:grid;grid-template-columns:120px 1fr 80px;gap:8px;align-items:center;font-size:12px;margin:4px 0}
+.bars i{display:block;height:12px;background:var(--red)}
+/* book controls */
+.ctrl{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-top:14px;flex-wrap:wrap}
+.count{font-size:12px;letter-spacing:.12em;font-weight:700;text-transform:uppercase}
+.dots{display:flex;gap:3px}
+.dots i{width:7px;height:20px;border:1.5px solid var(--ink);display:block;transform-origin:bottom right;transition:transform .25s}
+.dots i.done{background:var(--ink);transform:rotate(18deg)}
+.dots i.now{background:var(--red);border-color:var(--red)}
+.turn-out{animation:tout .22s ease-in forwards}
+.turn-in{animation:tin .28s ease-out}
+@keyframes tout{to{transform:rotateY(-14deg) translateX(-2%);opacity:0}}
+@keyframes tin{from{transform:rotateY(12deg) translateX(2%);opacity:0}}
+.turn-out.back{animation-name:toutb}.turn-in.back{animation-name:tinb}
+@keyframes toutb{to{transform:rotateY(14deg) translateX(2%);opacity:0}}
+@keyframes tinb{from{transform:rotateY(-12deg) translateX(-2%);opacity:0}}
+
+@media(max-width:860px){
+  .hero{grid-template-columns:1fr}
+  .spread,.spread.active{grid-template-columns:1fr}
+  .spread::after{display:none}
+  .pg{padding:24px 18px}
+  .pg + .pg{border-left:0;border-top:1px solid var(--line)}
+  #home,#book{padding:14px 16px 28px}
+  .bar{padding:12px 16px;flex-wrap:wrap}
+  .grid3{grid-template-columns:1fr 1fr}
+  table{font-size:10.5px} th{font-size:8px}
+}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <span>The Option Machine · AI integration plan for OMA</span>
+  <nav id="secnav" aria-label="Sections"></nav>
+</header>
+
+<!-- =================== HOME: THE MACHINE =================== -->
+<main id="home">
+  <div class="hero">
+    <h1>The Option Machine<span>.</span></h1>
+    <p><b>An AI integration plan for OMA.</b> It comes from seven experiments we ran this quarter. The ball is the table of contents: <b>hold the glove, release it to punch</b>, and the box where the ball lands opens that chapter.</p>
+  </div>
+
+  <div class="stage">
+    <canvas id="machine" aria-label="Rube Goldberg machine. A boxing glove punches a red ball into one of five boxes. Each box opens a chapter of the pamphlet." role="img"></canvas>
+    <div class="toast" id="toast"></div>
+  </div>
+
+  <div class="hud">
+    <div class="help"><b>Hold</b> the red button (or the space bar) and the power bar rises and falls. <b>Release</b> to punch. Light taps drop short and hard punches fly far, but the pegs make every shot a little different.</div>
+    <div style="display:flex;gap:14px;align-items:center">
+      <div class="meter" id="meter" aria-hidden="true"></div>
+      <button id="punch" aria-describedby="toast">Hold to punch</button>
+    </div>
+  </div>
+  <div class="skip"><span class="eyebrow">Or go straight to:</span><span id="skipbtns"></span></div>
+</main>
+
+<!-- =================== BOOKLET =================== -->
+<section id="book" aria-label="Pamphlet">
+  <div class="book-wrap" id="pages">
+
+  <!-- ===== 01 POSITION ===== -->
+  <article class="spread" data-sec="0">
+    <div class="pg inkbg">
+      <span class="eyebrow">Proposal plan · SBLD 560 · Fall 2026</span>
+      <p class="big" style="color:#fff">THE<br>OPTION<br>MACHINE<span style="color:var(--red)">.</span></p>
+      <p>How OMA should put AI to work, and where it should stop.</p>
+      <div class="folio"><span>01</span><span>Position</span></div>
+    </div>
+    <div class="pg coverimg" style="padding:0">
+      <img src="assets/cover_palm_house.jpg" alt="Our render made with Flux.2 Klein and our custom LoRA: a concrete house with rounded glass openings among palm trees at sunset" style="position:absolute;inset:0;width:100%;height:100%;max-height:none;border:0;object-fit:cover;object-position:50% 60%">
+      <span class="covercap">Our render · Flux.2 Klein + our custom LoRA</span>
+    </div>
+  </article>
+
+  <article class="spread" data-sec="0">
+    <div class="pg redbg">
+      <span class="eyebrow">Our position</span>
+      <h2 style="font-size:clamp(40px,5.4vw,80px)">Let the machine run the options. The partner signs the idea.</h2>
+      <div class="folio"><span>02</span><span>Position</span></div>
+    </div>
+    <div class="pg">
+      <span class="eyebrow">Dear OMA,</span>
+      <p>Your process starts by testing many options and ends with one sharp decision. This quarter, AI made the options cheap for us: façade variants, renders and massing studies we could never have drawn by hand in the time.</p>
+      <p>It never made the decision. Every useful output went through our judgment, and every failure was caught by someone who knew how to draw.</p>
+      <p>This pamphlet proposes where AI belongs at OMA: in competitions, AMO research and media. It also says where it doesn't belong, what it costs, and what the rules should be.</p>
+      <p><b>Nuor Alsekooty</b> &amp; <b>Tryna Okumu</b></p>
+      <div class="folio"><span>03</span><span>Letter</span></div>
+    </div>
+  </article>
+
+  <article class="spread" data-sec="0">
+    <div class="pg">
+      <span class="eyebrow">The firm</span>
+      <h2>Why OMA</h2>
+      <ul>
+        <li><b>Ten partners</b> across offices in Rotterdam, New York, Hong Kong and Australia.</li>
+        <li><b>OMA + AMO:</b> an architecture practice paired with a research studio that already works outside architecture.</li>
+        <li><b>Project range:</b> museums, towers, courthouses, libraries, headquarters, exhibitions, biennales, retail and runway shows.</li>
+        <li><b>Roughly 200–300 staff</b> across the four offices. We size this plan for about 250.</li>
+      </ul>
+      <p class="cap">Sources: oma.com/office, read 5 Nov 2026. Headcount from third-party listings (Architonic: ~220; World Architects: 300), undated and not confirmed by OMA.</p>
+      <div class="folio"><span>04</span><span>Firm</span></div>
+    </div>
+    <div class="pg">
+      <h3>What that means for AI</h3>
+      <p><b>Competitions:</b> lots of options, little time. This is where AI pays off most.</p>
+      <p><b>AMO:</b> already does research and media, so it can own testing and policy.</p>
+      <p><b>Public and government clients in four regions:</b> client data rules have to be strict and region-aware.</p>
+      <p><b>Authorship is the brand:</b> the concept must stay visibly human.</p>
+      <div class="folio"><span>05</span><span>Firm</span></div>
+    </div>
+  </article>
+
+  <article class="spread" data-sec="0">
+    <div class="pg">
+      <span class="eyebrow">The quarter at a glance</span>
+      <h2>Seven tests</h2>
+      <p>Each was tested on our own projects. Here is what we would take into OMA, and what we would only pilot.</p>
+      <div class="tally">
+        <div><span class="n">5</span><span class="stamp">KEEP</span></div>
+        <div><span class="n">2</span><span class="stamp">PILOT</span></div>
+        <div><span class="n">0</span><span class="stamp drop">DROP</span></div>
+      </div>
+      <p><b>Why no drops?</b> No workflow failed outright. What we drop is a way of using them: AI images presented as the final design, prompts borrowing another architect's name or style, and agent output that nobody has checked.</p>
+      <div class="folio"><span>06</span><span>Overview</span></div>
+    </div>
+    <div class="pg">
+      <ul class="list7">
+        <li><b>01</b><span class="t"><button data-go="4">Ethics debate</button><small>The user, not the tool, decides what is ethical. The debate set our policy rules.</small></span><span class="stamp">KEEP</span></li>
+        <li><b>02</b><span class="t"><button data-go="5">Text to image</button><small>Strong for mood and early concepts, with an honest prompt: our own idea, no copied names or styles.</small></span><span class="stamp">KEEP</span></li>
+        <li><b>03</b><span class="t"><button data-go="6">Image to image</button><small>Renders from our own Rhino views; the geometry comes from our model.</small></span><span class="stamp">KEEP</span></li>
+        <li><b>04</b><span class="t"><button data-go="7">Custom LoRA</button><small>The most efficient way to render one house style without changing the design.</small></span><span class="stamp">KEEP</span></li>
+        <li><b>05</b><span class="t"><button data-go="9">Image to video</button><small>Prompt-only clips failed us. With a first and last frame, the motion follows the design.</small></span><span class="stamp">PILOT</span></li>
+        <li><b>06</b><span class="t"><button data-go="10">Agentic modeling</button><small>Fast massing and brief checks, but errors only a drawing review caught. Pilot on one competition.</small></span><span class="stamp">PILOT</span></li>
+        <li><b>07</b><span class="t"><button data-go="13">Redline and revision</button><small>Keeps the architect in charge: we mark up, the agent revises, we check.</small></span><span class="stamp">KEEP</span></li>
+      </ul>
+      <div class="folio"><span>07</span><span>Overview</span></div>
+    </div>
+  </article>
+
+  <!-- ===== 02 TOOLKIT ===== -->
+  <article class="spread" data-sec="1">
+    <div class="pg">
+      <span class="eyebrow">Toolkit · Ethics debate</span>
+      <h2>Five motions</h2>
+      <p><span class="stamp">KEEP</span> The class argued five motions. Our policy answers each of them.</p>
+      <div class="motion"><q>Bias is a dataset problem that curation can correct.</q>We trained our own LoRAs, and they inherited the bias of the images we chose. Curation moves the bias; it doesn't remove it.</div>
+      <div class="motion"><q>Work is authored by whoever directed it.</q>Only partly. Prompts read as instructions, not authorship. Selection, arrangement and edits by hand are what we can defend.</div>
+      <div class="folio"><span>08</span><span>Toolkit</span></div>
+    </div>
+    <div class="pg">
+      <div class="motion"><q>The energy cost is justified by the output.</q>Only when the output is used. Generating 40 options and keeping one has to be counted, not ignored.</div>
+      <div class="motion"><q>AI gives design power to people who were locked out.</q>True for clients and the public at workshops; less true inside a firm, where it concentrates power in whoever runs the tools.</div>
+      <div class="motion"><q>AI frees juniors from work that never taught them much.</q>We disagree. Drawing the section is how we caught the agent's errors.</div>
+      <div class="debate">
+        <h3>The full debate, in short</h3>
+        <p>We started between two positions. <b>Molly Crabapple:</b> art is human, and no one's work should be used without permission or credit. <b>Wolf D. Prix:</b> AI is a coworker whose mistakes open new forms, while the architect decides.</p>
+        <p>The <b>creative-control</b> reading settled it: a prompt is an instruction, not authorship. What we can defend is selection, arrangement and hand edits, so every policy rule keeps a person deciding.</p>
+      </div>
+      <div class="folio"><span>09</span><span>Toolkit</span></div>
+    </div>
+  </article>
+
+  <article class="spread" data-sec="1">
+    <div class="pg">
+      <span class="eyebrow">Toolkit · Text to image</span>
+      <h2>Text to image</h2>
+      <div class="meta"><span>Codex</span><span>Nano Banana</span><span class="r">Competition</span><span>Concept</span></div>
+      <div class="wl">
+        <div><b>Win</b><p>A very specific prompt (form, material, light, setting) got us close to the image we had in mind, like the desert tower here.</p></div>
+        <div class="loss"><b>Loss</b><p>Even with a detailed prompt, it still didn't give us the exact result we needed. The model decides the details, so we kept regenerating instead of designing.</p></div>
+      </div>
+      <p><span class="stamp">KEEP</span> For mood and early concepts, with an honest prompt. Never presented as the final design.</p>
+      <div class="folio"><span>10</span><span>Toolkit</span></div>
+    </div>
+    <div class="pg">
+      <img src="assets/t2i_desert_tower.jpg" alt="Our text-to-image output: a yellow and green tower of cantilevered round terraces in a cactus desert" style="width:auto;max-width:100%;max-height:min(62vh,600px);margin:0 auto;object-fit:contain">
+      <p class="cap">Our text-to-image output, made with Codex and Nano Banana.</p>
+      <div class="folio"><span>11</span><span>Toolkit</span></div>
+    </div>
+  </article>
+
+  <article class="spread" data-sec="1">
+    <div class="pg">
+      <span class="eyebrow">Toolkit · Image to image</span>
+      <span class="stamp stamp-tr" title="Our verdict: keep, for visualization and rendering">KEEP</span>
+      <h2>Image to image</h2>
+      <div class="meta"><span class="r">Qwen Image 2.1</span><span>Flux.2 Klein 9B</span><span>Flux Kontext</span><span>Z-Image + Canny</span></div>
+      <div class="wl">
+        <div><b>Win</b><p>Qwen Image 2.1 was our most reliable all-rounder: it kept our massing and was the only model that took a second image as a material reference. A clear text prompt mattered as much as the input image.</p></div>
+        <div class="loss"><b>Loss</b><p>Each model drifted its own way: Kontext kept the model look and the black background, and Z-Image lost every colour. Every render still needed checking.</p></div>
+      </div>
+      <div class="lensrow">
+        <div class="lens tall" tabindex="0" role="group" aria-label="Lens reveal: our physical model of foam, timber and steel, with the AI render underneath. Drag the red circle or use the arrow keys; press Enter to reveal all." style="height:min(30vh,300px);width:calc(min(30vh,300px) * 0.755)">
+          <img src="assets/i2i_model_in.jpg" alt="Input: our physical study model in pink foam, timber blocks and a steel angle on a concrete base">
+          <img class="after" src="assets/i2i_model_out.jpg" alt="Output: the same composition as a travertine water feature with stepped pools, planting and a small tree">
+          <span class="ring"></span><span class="lab">MODEL</span>
+        </div>
+        <p class="cap"><b>Our physical model, rendered:</b> a study model in foam, timber and steel becomes a travertine water garden. Same camera, same massing; the AI changed every material.<br><br>Drag the red lens to look through the model. Double-click to reveal all.</p>
+      </div>
+      <div class="folio"><span>12</span><span>Toolkit</span></div>
+    </div>
+    <div class="pg">
+      <div class="tog" id="tog1" role="group" aria-label="Choose an output">
+        <button class="on" data-src="assets/a03_original.jpg" data-cap="Original: our physical model in foam, timber and steel. The same photo and the same prompt went into all four models.">Original</button>
+        <button data-src="assets/a03_klein.jpg" data-cap="Flux.2 Klein 9B reads the photo as a concept and invents the most.">Flux.2 Klein 9B</button>
+        <button data-src="assets/a03_qwen.jpg" data-cap="Qwen Image 2.1 reads it as a layout to respect and gave the best balance, our most reliable all-rounder.">Qwen Image 2.1</button>
+        <button data-src="assets/a03_kontext.jpg" data-cap="Flux Kontext reads the whole photo and keeps too much of it, including the black background and the model look.">Flux Kontext</button>
+        <button data-src="assets/a03_zimg.jpg" data-cap="Z-Image + Canny reads only edges, so it keeps the form and loses the colours.">Z-Image + Canny</button>
+      </div>
+      <img id="tog1img" src="assets/a03_original.jpg" alt="Our physical study model in foam, timber and steel" style="object-fit:contain;background:#000;height:min(48vh,470px);max-height:none">
+      <p class="cap" id="tog1cap">Original: our physical model in foam, timber and steel. The same photo and the same prompt went into all four models.</p>
+      <p class="cap">From our image-to-image comparison board (dusk prompt row).</p>
+      <div class="folio"><span>13</span><span>Toolkit</span></div>
+    </div>
+  </article>
+
+  <article class="spread" data-sec="1">
+    <div class="pg">
+      <span class="eyebrow">Toolkit · Custom LoRA</span>
+      <h2>Teaching it our eye</h2>
+      <div class="meta"><span>Flux.2 Klein 9B edit</span><span>Custom LoRA · fal.ai</span><span class="r">Competition</span><span>Marketing</span></div>
+      <p>We trained edit-LoRAs (Colorful, Realistic and MIR-style) on paired images: an untextured Rhino render as the start image and a finished image as the end. The MIR set kept 20 pairs; rejected pairs went to a separate <i>dropped</i> folder.</p>
+      <div class="wl">
+        <div><b>Win</b><p>The most efficient way to render: one consistent house style across every view, without changing the design details of our model.</p></div>
+        <div class="loss"><b>Loss</b><p>The LoRA is only as good as its training pairs. We had to curate and drop pairs by hand, and the right strength changes from image to image.</p></div>
+      </div>
+      <p><span class="stamp">KEEP</span> Our house style on every render, at a strength picked by eye.</p>
+      <div class="folio"><span>14</span><span>Toolkit</span></div>
+    </div>
+    <div class="pg">
+      <div class="lens wide" tabindex="0" role="group" aria-label="Lens reveal: Hollis Rhino clay view with the AI render underneath. Drag the red circle or use the arrow keys; press Enter to reveal all.">
+        <img src="assets/hollis_clay_wide.jpg" alt="Hollis Realty office, Rhino clay view">
+        <img class="after" src="assets/hollis_sunset.jpg" alt="The same view rendered with our pipeline at sunset">
+        <span class="ring"></span><span class="lab">RHINO CLAY</span><span class="lab r">AI RENDER</span>
+      </div>
+      <div class="lensrow">
+        <div class="lens tall" tabindex="0" role="group" aria-label="Lens reveal: Rhino test model of a sawtooth library with our Colorful LoRA output underneath. Drag the red circle or use the arrow keys; press Enter to reveal all." style="width:calc(min(30vh,300px) * 0.667)">
+          <img src="assets/lora_pair_rhino.jpg" alt="Rhino input: untextured sawtooth-roof library pavilion with a pond and path">
+          <img class="after" src="assets/lora_pair_out.jpg" alt="Our Colorful LoRA output: the same view as a coloured architectural illustration">
+          <span class="ring"></span><span class="lab">RHINO</span>
+        </div>
+        <p class="cap"><b>Top:</b> our Hollis office, same camera in clay and as the AI render. <b>Bottom:</b> our Colorful LoRA on a Rhino test model (sawtooth library, strength 1.0). The geometry stays; the LoRA adds our drawing style.<br><br>Drag the red lens to look through the model. Double-click or press Enter to reveal all.</p>
+      </div>
+      <div class="folio"><span>15</span><span>Toolkit</span></div>
+    </div>
+  </article>
+
+  <article class="spread" data-sec="1">
+    <div class="pg">
+      <span class="eyebrow">Toolkit · Custom LoRA · losses</span>
+      <h2>What the LoRA got wrong</h2>
+      <p>We ran the same Rhino model through our <b>Colorful LoRA</b> at nine strengths. Drag the slider to see what each one does.</p>
+      <ul>
+        <li><b>Too weak (0.0–1.0):</b> the style barely moves. Every frame looks like the base model, so the LoRA adds little.</li>
+        <li><b>Too strong (1.5–1.7):</b> the style finally shows, but the building breaks. The A-frame turns into coloured patches and the water becomes a mosaic.</li>
+        <li><b>The lesson:</b> there was no single "right" strength. Someone has to pick it for each image, by eye.</li>
+        <li><b>Cost:</b> each 1,000-step training run is about $6.40 at fal's published rate, so three LoRAs cost about $20 before a single render.</li>
+      </ul>
+      <div class="folio"><span>16</span><span>Toolkit</span></div>
+    </div>
+    <div class="pg">
+      <div class="strength" id="str1">
+        <div class="sframe">
+          <img src="assets/lora_str_rhino.jpg" alt="Rhino input: untextured A-frame cabin" data-l="Rhino input">
+          <img src="assets/lora_str_s00.jpg" alt="LoRA strength 0.0" data-l="0.0">
+          <img src="assets/lora_str_s02.jpg" alt="LoRA strength 0.2" data-l="0.2">
+          <img src="assets/lora_str_s04.jpg" alt="LoRA strength 0.4" data-l="0.4">
+          <img src="assets/lora_str_s06.jpg" alt="LoRA strength 0.6" data-l="0.6">
+          <img src="assets/lora_str_s08.jpg" alt="LoRA strength 0.8" data-l="0.8">
+          <img src="assets/lora_str_s10.jpg" alt="LoRA strength 1.0" data-l="1.0">
+          <img src="assets/lora_str_s15.jpg" alt="LoRA strength 1.5" data-l="1.5">
+          <img src="assets/lora_str_s17.jpg" alt="LoRA strength 1.7" data-l="1.7">
+          <span class="sval">Rhino input</span>
+        </div>
+        <label class="sbar"><span>LoRA strength</span><input type="range" min="0" max="8" step="1" value="0" aria-label="LoRA strength"></label>
+        <div class="sticks"><span>Rhino</span><span>0.0</span><span>0.2</span><span>0.4</span><span>0.6</span><span>0.8</span><span>1.0</span><span>1.5</span><span>1.7</span></div>
+      </div>
+      <p class="cap">Our Colorful LoRA on Test 3 (A-frame forest cabin), from our custom LoRA test board. Base model: Flux.2 Klein 9B edit.</p>
+      <div class="folio"><span>17</span><span>Toolkit</span></div>
+    </div>
+  </article>
+
+  <article class="spread" data-sec="1">
+    <div class="pg">
+      <span class="eyebrow">Toolkit · Image to video</span>
+      <h2>Image to video</h2>
+      <div class="meta"><span>LTX 2.0 i2v</span><span>Flux 3 i2v · 2 images (first + last frame)</span><span class="r">Marketing</span><span>Client presentation</span></div>
+      <div class="wl">
+        <div><b>Win</b><p>Giving Flux 3 a first and a last frame worked: the motion followed our design, from program blocks to building, in a 5-second clip.</p></div>
+        <div class="loss"><b>Loss</b><p>With a prompt alone, the clips didn't do what we needed. The model invented its own motion, and most raw Flux clips were over 20 MB each.</p></div>
+      </div>
+      <p><span class="stamp">PILOT</span> Marketing only, never a design-review walkthrough.</p>
+      <figure style="margin:0">
+        <video class="clip" src="assets/video_flux3_blocks.mp4" muted loop playsinline controls preload="metadata" aria-label="Flux 3 image-to-video clip: program blocks turning into the building"></video>
+        <figcaption class="cap"><b>Our clip:</b> Flux 3 image to video from two images, a first frame and a last frame. The model fills in the motion between them: program blocks into building. Both frames are reference images from OMA's website; the motion between them is our Flux 3 output.</figcaption>
+      </figure>
+      <div class="folio"><span>18</span><span>Toolkit</span></div>
+    </div>
+    <div class="pg">
+      <div class="grid2">
+        <figure style="margin:0"><video style="height:min(24vh,230px);object-fit:cover;background:#000" src="assets/video_ltx2.mp4" muted loop playsinline controls preload="metadata"></video><figcaption class="cap"><b>LTX 2.0</b> i2v</figcaption></figure>
+        <figure style="margin:0"><video style="height:min(24vh,230px);object-fit:cover;background:#000" src="assets/video_flux3_beeski.mp4" muted loop playsinline controls preload="metadata"></video><figcaption class="cap"><b>Flux 3</b> i2v</figcaption></figure>
+      </div>
+      <img style="max-height:min(30vh,280px)" src="assets/beeski_snowboard.jpg" alt="Our BeeSki still: the SCAD bee mascot snowboarding through an indoor ski resort under a glass roof">
+      <p class="cap"><b>The same start frame, two models.</b> This BeeSki still went into both LTX 2.0 and Flux 3 (clips above). Play them to compare the motion each model invented from it.</p>
+      <div class="folio"><span>19</span><span>Toolkit</span></div>
+    </div>
+  </article>
+
+  <article class="spread" data-sec="1">
+    <div class="pg">
+      <span class="eyebrow">Toolkit · Agentic modeling</span>
+      <h2>The agent models, we prompt</h2>
+      <div class="meta"><span>Claude (Claude Code)</span><span>RhinoMCP 0.4.1.1</span><span>Rhino</span><span class="r">Concept</span><span>Schematic</span></div>
+      <p>Hollis Realty office: the agent built the levels, the core, three façade systems, plans and sections from our prompts. Every step went into a log.</p>
+      <div class="wl">
+        <div><b>Win</b><p>It checked the brief against its own geometry: <b>12,075 sf</b> against a 12,000 target, a <b>4,800 sf</b> footprint under the 5,000 cap, and a <b>49 ft</b> top under the 50 ft limit.</p></div>
+        <div class="loss"><b>Loss</b><p>Everything needed reviewing. See the next spread.</p></div>
+      </div>
+      <p><span class="stamp">PILOT</span> One competition first, with a full prompt log and a drawing review.</p>
+      <div class="folio"><span>20</span><span>Toolkit</span></div>
+    </div>
+    <div class="pg">
+      <img src="assets/plan_ground.jpg" alt="Ground floor plan drawn by the agent">
+      <div class="grid3">
+        <img src="assets/facade_a.jpg" alt="Facade option A, triangle panels">
+        <img src="assets/facade_b.jpg" alt="Facade option B, fan fins">
+        <img src="assets/facade_c.jpg" alt="Facade option C, wave mesh">
+      </div>
+      <p class="cap">Ground floor plan and three façade options, all modeled by the agent.</p>
+      <div class="folio"><span>21</span><span>Toolkit</span></div>
+    </div>
+  </article>
+
+  <article class="spread" data-sec="1">
+    <div class="pg">
+      <span class="eyebrow">Toolkit · Agentic modeling · a second model</span>
+      <h2 class="h2s">A round building</h2>
+      <div class="meta"><span>Agent model</span><span>Codex + Nano Banana</span><span class="r">Competition</span><span>Concept</span></div>
+      <p>A second agent model: a round building with a triangulated glass skin and a roof court, set into an existing block, then rendered with AI.</p>
+      <img style="max-height:min(32vh,300px);object-fit:contain;background:#fff" src="assets/agent2_axo.jpg" alt="Agent-drawn axonometric: a round building with a triangulated facade among existing city blocks">
+      <p class="cap">Axonometric line drawing from the agent model. Our prompts set the round massing, the triangulated skin and the roof court; the agent built it into the existing block. <b>Render brief:</b> eye level, rainy dusk, lit interiors behind the skin, and two people for scale.</p>
+      <div class="folio"><span>22</span><span>Toolkit</span></div>
+    </div>
+    <div class="pg coverimg" style="padding:0">
+      <img src="assets/agent2_rain.jpg" alt="AI render of the round building at dusk in the rain, a couple under a yellow umbrella" style="position:absolute;inset:0;width:100%;height:100%;max-height:none;border:0;object-fit:cover">
+      <span class="covercap">AI render of the agent model · Codex + Nano Banana</span>
+    </div>
+  </article>
+
+  <article class="spread" data-sec="1">
+    <div class="pg redbg">
+      <span class="eyebrow">Toolkit · Agentic modeling · losses</span>
+      <h2>What it got wrong</h2>
+      <ul>
+        <li>It renamed the Perspective viewport, so later view commands failed.</li>
+        <li>It ran grid-A columns up to the roof, although L3 starts further east.</li>
+        <li>It hung the façade mesh past the edge of the building.</li>
+        <li>It placed section trees over the balconies and a figure inside the building.</li>
+        <li>The bridge timed out on saves; we confirmed each one from file times.</li>
+      </ul>
+      <p>We caught every one by looking at a drawing, not by reading the agent's report.</p>
+      <div class="folio"><span>24</span><span>Toolkit</span></div>
+    </div>
+    <div class="pg">
+      <img style="max-height:min(27vh,260px)" src="assets/err_mesh.jpg" alt="Facade mesh extending past the building">
+      <img style="max-height:min(27vh,260px)" src="assets/err_stair_clash.jpg" alt="Stair A clash at level 3">
+      <p class="cap"><b>Top:</b> the wave-mesh façade first ran past the edge of the building; we boxed it on a capture and the agent trimmed it. <b>Bottom:</b> at Level 3, Stair A clashed with its curved shaft walls until we marked up the plan. Both caught by eye, both logged in our prompt log.</p>
+      <div class="folio"><span>25</span><span>Toolkit</span></div>
+    </div>
+  </article>
+
+  <article class="spread" data-sec="1">
+    <div class="pg">
+      <span class="eyebrow">Toolkit · Redline and revision</span>
+      <h2>Redlines for a machine</h2>
+      <p>We marked up the drawings in red and gave them back to the agent.</p>
+      <h3>Where did the agent misread us?</h3><p>It didn't understand quick redlines. A fast circle or arrow wasn't enough, so we had to send several rounds of changes before it got the revision right.</p>
+      <h3>What did we fix by hand?</h3><p>Furniture placement. The agent kept putting furniture in the wrong place, so we placed it in the correct location ourselves and kept sending redlines until the plan read right.</p>
+      <h3>Would we do it again?</h3><p><span class="stamp">KEEP</span> Yes. It keeps the architect in charge: we mark up, the agent revises, we check. It is the safeguard that makes agentic modeling usable.</p>
+      <div class="folio"><span>26</span><span>Toolkit</span></div>
+    </div>
+    <div class="pg">
+      <img src="assets/err_markup.jpg" alt="Our red-line fix proposal markup on the plan">
+      <img src="assets/section_b.jpg" alt="Section B-B drawn by the agent">
+      <p class="cap">Our red-line markup and the revised Section B-B.</p>
+      <div class="folio"><span>27</span><span>Toolkit</span></div>
+    </div>
+  </article>
+
+  <!-- ===== 03 INTEGRATION ===== -->
+  <article class="spread full" data-sec="2">
+    <div class="pg">
+      <span class="eyebrow">Integration · where each workflow belongs</span>
+      <h2 class="h2s">The stage matrix</h2>
+      <div class="mx">
+        <div class="mxscroll"><div class="pgrid" id="pgrid" role="grid" aria-label="Stage matrix: workflows by project stage"></div></div>
+        <aside class="mxpanel" id="mxpanel" aria-live="polite"></aside>
+      </div>
+      <div class="mxlegend">
+        <span><i class="lg core"></i>Core</span><span><i class="lg pilot"></i>Pilot only</span><span><i class="lg none"></i>Not used</span>
+        <span class="cap" style="margin-left:auto">Click a workflow to slide its row · click a block to turn it over</span>
+      </div>
+      <p class="cap">Roles are our proposal. No AI output goes into a stamped drawing. Text-to-image, image-to-image and LoRA row images build on OMA reference images.</p>
+      <div class="folio"><span>28–29</span><span>Integration</span></div>
+    </div>
+  </article>
+
+  <article class="spread" data-sec="2">
+    <div class="pg">
+      <span class="eyebrow">Integration · rollout</span>
+      <h2>Pilot, three months, one year</h2>
+      <div class="phase"><h3>Pilot · one competition</h3><p>One team and one office (Rotterdam, proposed). Image to image + LoRA for option renders; the agent for massing checks. Every prompt is logged the way we did it.</p></div>
+      <div class="folio"><span>30</span><span>Integration</span></div>
+    </div>
+    <div class="pg">
+      <div class="phase"><h3>Three months</h3><p>AMO writes the policy from the pilot log. An office LoRA is trained on OMA's own approved images. Two workshops per office.</p></div>
+      <div class="phase"><h3>One year</h3><p>All four offices. Local GPUs where client data rules require them. Yearly review: what we keep, what we drop, the energy used.</p></div>
+      <div class="phase redbg"><h3>How we measure the pilot</h3>
+        <ul>
+          <li><b>Hours per option set:</b> by hand vs. with AI, logged on every competition board.</li>
+          <li><b>Errors caught in review:</b> how many agent mistakes a drawing check finds per round.</li>
+          <li><b>Redline rounds per revision:</b> our test needed several; the pilot should need fewer.</li>
+          <li><b>Renders that kept the design:</b> the share used without fixing geometry or materials.</li>
+          <li><b>GPU hours per competition:</b> reported next to the number of options made.</li>
+        </ul>
+        <p style="font-size:12px;opacity:.85">If the pilot doesn't save time without adding errors, we stop at three months.</p></div>
+      <div class="folio"><span>31</span><span>Integration</span></div>
+    </div>
+  </article>
+
+  <!-- ===== 04 COSTS ===== -->
+  <article class="spread" data-sec="3">
+    <div class="pg">
+      <span class="eyebrow">Costs · calculator</span>
+      <h2>What it costs</h2>
+      <div class="seg" role="group" aria-label="Cloud or local"><button class="on" data-mode="cloud">Cloud</button><button data-mode="local">Local</button></div>
+      <div class="calc" id="calc">
+        <label>Seats (team size)<input type="number" min="0" id="c_seats" value="6"></label>
+        <label>Subscriptions per seat, $/month<input type="number" min="0" id="c_sub" value="40"></label>
+        <label class="cl">Cloud GPU hours per month<input type="number" min="0" id="c_gpuh" value="10"></label>
+        <label class="cl">Cloud GPU, $/hour<input type="number" min="0" step="0.01" id="c_gpur" value="4.54"></label>
+        <label class="lo" style="display:none">Workstation GPU, $ each<input type="number" min="0" id="c_ws" value="0"></label>
+        <label class="lo" style="display:none">Workstations<input type="number" min="0" id="c_wsn" value="2"></label>
+        <label>Training hours per person<input type="number" min="0" id="c_th" value="12"></label>
+        <label>Staff cost, $/hour<input type="number" min="0" id="c_rate" value="40"></label>
+      </div>
+      <p class="cap">Defaults from published prices: $40/seat/month (Claude Pro + Comfy Cloud Standard) and ≈ $4.54 per extra GPU-hour. Seats, hours and workstation count are our proposals; staff time uses an assumed $40/hour blended rate; replace it with OMA's own.</p>
+      <div class="folio"><span>32</span><span>Costs</span></div>
+    </div>
+    <div class="pg">
+      <span class="eyebrow">First year</span>
+      <div class="out" id="c_total">$0</div>
+      <p id="c_note" class="cap"></p>
+      <div class="bars" id="c_bars"></div>
+      <h3>Our quarter, as the baseline</h3>
+      <ul>
+        <li><b>fal.ai, ≈ $25:</b> three LoRA trainings at about 1,000 steps (≈ $6.40 each) plus about 110 edit images at $0.03–0.045.</li>
+        <li><b>Claude plan, ≈ $60:</b> Pro at $20/month for three months (Max would be $100/month).</li>
+        <li><b>Cloud GPU / ComfyUI, ≈ $40:</b> Comfy Cloud Standard at $20/month for two months.</li>
+        <li><b>Our hours, ≈ 60 each:</b> about 8–9 hours per assignment across seven.</li>
+      </ul>
+      <p class="cap"><b>≈ $125 per person in cash, plus our time.</b> Estimates from published prices (fal.ai, claude.com, comfy.org, Nov 2026) and our own logs, not receipts.</p>
+      <div class="folio"><span>33</span><span>Costs</span></div>
+    </div>
+  </article>
+
+  <!-- ===== 05 POLICY ===== -->
+  <article class="spread" data-sec="4">
+    <div class="pg">
+      <span class="eyebrow">Risks and policy · draft</span>
+      <h2>OMA AI policy, v0.1</h2>
+      <h3>1 · Client data</h3><p>Client files never go into a public model; where a region requires it, work runs on local GPUs. Every project lists its tools.</p>
+      <h3>2 · Authorship</h3><p>A partner signs every concept. AI images are labeled in reviews, and hand edits are recorded: that's where authorship lives.</p>
+      <h3>3 · Bias</h3><p>Office LoRAs train only on OMA's own cleared images, never found photos. Our MIR set used one; we wouldn't repeat it. AMO reviews each set.</p>
+      <div class="folio"><span>34</span><span>Policy</span></div>
+    </div>
+    <div class="pg">
+      <h3>4 · Energy</h3><p>Every competition reports its GPU hours next to the options it made. Discarded tests still count.</p>
+      <h3>5 · What juniors still learn by hand</h3><p>Sections, plans, physical models, and checking a drawing against a brief. That's how we caught every agent error this quarter.</p>
+      <h3>6 · Equity</h3><p>Tools and training are open to every office and every level, not only the computation team.</p>
+      <div class="roots"><h3>Where each rule comes from</h3>
+        <table>
+          <tr><td>1 · Client data</td><td>Crabapple: no one's work used without permission</td></tr>
+          <tr><td>2 · Authorship</td><td>Motion: "authored by whoever directed it" + the creative-control reading</td></tr>
+          <tr><td>3 · Bias</td><td>Motion: "bias is a dataset problem curation can correct"</td></tr>
+          <tr><td>4 · Energy</td><td>Motion: "the energy cost is justified by the output"</td></tr>
+          <tr><td>5 · Juniors</td><td>Motion: "AI frees juniors…" + Prix: the architect makes the main decisions</td></tr>
+          <tr><td>6 · Equity</td><td>Motion: "AI gives design power to people who were locked out"</td></tr>
+        </table></div>
+      <div class="folio"><span>35</span><span>Policy</span></div>
+    </div>
+  </article>
+
+  <article class="spread" data-sec="4">
+    <div class="pg inkbg">
+      <span class="eyebrow">Back cover</span>
+      <p class="big" style="color:#fff;font-size:clamp(50px,8vw,120px)">Machines iterate.<br><span style="color:var(--red)">Architects decide.</span></p>
+      <div class="folio"><span>36</span><span>End</span></div>
+    </div>
+    <div class="pg">
+      <h3>Team</h3><p>Nuor Alsekooty · Tryna Okumu</p>
+      <h3>Built with</h3><p>Claude (Claude Code) for code and layout; Matter.js for the ball physics; Python (Pillow, PyMuPDF) and ffmpeg to prepare our images and video; Figma for our LoRA test board.</p>
+      <h3>Images</h3><p>All images and video are our own work from SBLD 560, Fall 2026. Reference images used for the pamphlet's style are not reproduced here.</p>
+      <h3>Course</h3><p>SBLD 560 Designing with AI · SCAD · Fall 2026</p>
+      <button data-home>Play the machine again</button>
+      <div class="folio"><span>37</span><span>End</span></div>
+    </div>
+  </article>
+
+  </div>
+
+  <div class="ctrl">
+    <button id="toHome">◀ Machine</button>
+    <div style="display:flex;gap:14px;align-items:center">
+      <div class="dots" id="dots" aria-hidden="true"></div>
+      <span class="count" id="count"></span>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center"><span class="drag-hint">Grab a page and pull it to turn</span><button id="prev" aria-label="Previous spread">←</button><button id="next" aria-label="Next spread">→</button></div>
+  </div>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+<script>
+/* ============================================================
+   SECTIONS
+   ============================================================ */
+const SECTIONS = ["Position","Toolkit","Integration","Costs","Policy"];
+const spreads = [...document.querySelectorAll('.spread')];
+const secStart = SECTIONS.map((_,i)=>spreads.findIndex(s=>+s.dataset.sec===i));
+const home = document.getElementById('home'), book = document.getElementById('book');
+let cur = 0;
+
+const secnav = document.getElementById('secnav'), skip = document.getElementById('skipbtns');
+SECTIONS.forEach((s,i)=>{
+  const label = String(i+1).padStart(2,'0')+' '+s;
+  for (const host of [secnav, skip]){
+    const b=document.createElement('button'); b.textContent=label; b.onclick=()=>openBook(secStart[i]); host.appendChild(b);
+  }
+});
+const navBtns=[...secnav.children];
+
+const dots=document.getElementById('dots');
+spreads.forEach(()=>dots.appendChild(document.createElement('i')));
+
+/* ============================================================
+   PAGE TURNING: grab a page and drag it around the spine
+   - desktop: a 3D leaf (front = this page, back = the next page)
+     follows the pointer; past ~70° it turns, otherwise it falls back
+   - phone / single-page spreads: swipe the whole page
+   ============================================================ */
+const wrap=document.getElementById('pages');
+const reduceMo=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
+const isDesk=()=>matchMedia('(min-width:861px)').matches;
+const NO_DRAG='button,a,input,select,textarea,video,.lens,.morph,.strength,.mx,.tog,.calc,.seg,table,[data-go]';
+let flip=null, busy=false;
+
+function canLeaf(a,b){ return isDesk() && b>=0 && b<spreads.length && !spreads[a].classList.contains('full') && !spreads[b].classList.contains('full'); }
+function clean(node){ const c=node.cloneNode(true); c.removeAttribute('id'); c.querySelectorAll('[id]').forEach(n=>n.removeAttribute('id')); c.setAttribute('aria-hidden','true'); return c; }
+
+function startFlip(dir){
+  const target=cur+dir; if(!canLeaf(cur,target)) return null;
+  const from=spreads[cur], to=spreads[target];
+  const fp=from.querySelectorAll(':scope > .pg'), tp=to.querySelectorAll(':scope > .pg');
+  const ov=document.createElement('div'); ov.className='flipper';
+  const cover=clean(dir>0?fp[0]:fp[1]); cover.classList.add('half',dir>0?'l':'r');   // the page that stays put
+  const leaf=document.createElement('div'); leaf.className='leaf '+(dir>0?'r':'l');
+  const front=clean(dir>0?fp[1]:fp[0]); front.classList.add('face','front');          // page being lifted
+  const back=clean(dir>0?tp[0]:tp[1]);  back.classList.add('face','back');            // what's printed on its back
+  const shade=document.createElement('i'); shade.className='shade';
+  const shadeB=document.createElement('i'); shadeB.className='shade b';
+  front.appendChild(shade); back.appendChild(shadeB);
+  leaf.append(front,back); ov.append(cover,leaf);
+  from.classList.remove('active'); to.classList.add('active'); to.appendChild(ov);
+  flip={dir,target,from,to,ov,leaf,shade,shadeB,angle:0};
+  setAngle(0); return flip;
+}
+function setAngle(a){
+  if(!flip) return; flip.angle=a;
+  flip.leaf.style.transform=`rotateY(${a}deg)`;
+  const t=Math.abs(a)/180;                       // 0 → 1 through the turn
+  flip.shade.style.opacity=(t*0.55).toFixed(3);
+  flip.shadeB.style.opacity=((1-t)*0.55).toFixed(3);
+}
+function endFlip(commit, ms=420){
+  if(!flip) return; const f=flip, a0=f.angle, a1=commit?(f.dir>0?-180:180):0;
+  busy=true;
+  const done=()=>{
+    f.ov.remove();
+    if(commit){ cur=f.target; update(); }
+    else { f.to.classList.remove('active'); f.from.classList.add('active'); }
+    flip=null; busy=false;
+  };
+  if(reduceMo()){ setAngle(a1); return done(); }
+  const t0=performance.now(), dur=ms*Math.max(.35,Math.abs(a1-a0)/180);
+  (function step(now){
+    const k=Math.min(1,(now-t0)/dur), e=1-Math.pow(1-k,3);
+    setAngle(a0+(a1-a0)*e);
+    k<1?requestAnimationFrame(step):done();
+  })(t0);
+}
+
+function show(i, dir=1){
+  if(busy||flip) return;
+  i=Math.max(0,Math.min(spreads.length-1,i));
+  if(Math.abs(i-cur)===1 && canLeaf(cur,i) && spreads[cur].classList.contains('active') && !reduceMo()){
+    startFlip(i-cur); endFlip(true,620); return;
+  }
+  const old=spreads[cur], nw=spreads[i];
+  const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
+  const swap=()=>{
+    old.classList.remove('active','turn-out','back');
+    nw.classList.add('active'); nw.classList.toggle('back',dir<0);
+    if(!reduce){nw.classList.add('turn-in'); setTimeout(()=>nw.classList.remove('turn-in','back'),300);}
+    cur=i; update();
+    if(!isDesk()) window.scrollTo({top:book.offsetTop,behavior:reduceMo()?'auto':'smooth'});
+  };
+  if(old!==nw && old.classList.contains('active') && !reduce){
+    old.classList.toggle('back',dir<0); old.classList.add('turn-out'); setTimeout(swap,220);
+  } else swap();
+}
+/* drag handling */
+(function(){
+  let x0=0,t0=0,dx=0,mode=null,pid=null,dirS=0,onCorner=null;
+  wrap.addEventListener('pointerdown',e=>{
+    if(e.button!==0||busy||flip||e.target.closest(NO_DRAG)) return;
+    x0=e.clientX; t0=performance.now(); dx=0; mode='pending'; pid=e.pointerId;
+    onCorner=e.target.closest('.corner'); wrap.setPointerCapture(pid);
+  });
+  wrap.addEventListener('pointermove',e=>{
+    if(!mode||e.pointerId!==pid) return;
+    dx=e.clientX-x0; const w=wrap.clientWidth;
+    if(mode==='pending' && Math.abs(dx)>8){
+      dirS=dx<0?1:-1;                                   // pull left = next page, pull right = previous
+      const tgt=cur+dirS;
+      if(tgt<0||tgt>=spreads.length){ mode='edge'; }
+      else if(startFlip(dirS)){ mode='leaf'; }
+      else mode='swipe';
+      wrap.classList.add('grabbing');
+    }
+    if(mode==='leaf'){
+      const a=dx/(w/2)*180;
+      setAngle(dirS>0?Math.max(-180,Math.min(0,a)):Math.min(180,Math.max(0,a)));
+    } else if(mode==='swipe'||mode==='edge'){
+      const s=spreads[cur], d=mode==='edge'?dx*0.15:dx;
+      s.style.transform=`translateX(${d}px) rotateY(${d/w*-12}deg)`; s.style.opacity=1-Math.min(.6,Math.abs(d)/w);
+    }
+  });
+  const up=e=>{
+    if(!mode||e.pointerId!==pid) return;
+    const w=wrap.clientWidth, v=dx/Math.max(1,performance.now()-t0);  // px per ms
+    wrap.classList.remove('grabbing');
+    if(mode==='pending' && onCorner){ show(cur+(onCorner.classList.contains('r')?1:-1), onCorner.classList.contains('r')?1:-1); }
+    else if(mode==='leaf'){ endFlip(Math.abs(flip.angle)>70 || (Math.abs(v)>0.6 && Math.abs(flip.angle)>25)); }
+    else if(mode==='swipe'||mode==='edge'){
+      const s=spreads[cur]; s.style.transition='transform .25s,opacity .25s'; s.style.transform=''; s.style.opacity='';
+      setTimeout(()=>s.style.transition='',260);
+      if(mode==='swipe' && (Math.abs(dx)>w*0.18||Math.abs(v)>0.6)) show(cur+dirS,dirS);
+    }
+    mode=null;
+  };
+  wrap.addEventListener('pointerup',up); wrap.addEventListener('pointercancel',up);
+
+  // trackpad two-finger swipe
+  let acc=0, lastWheel=0;
+  wrap.addEventListener('wheel',e=>{
+    if(Math.abs(e.deltaX)<=Math.abs(e.deltaY)) return;
+    e.preventDefault(); const now=performance.now();
+    if(now-lastWheel>400) acc=0; lastWheel=now; acc+=e.deltaX;
+    if(Math.abs(acc)>80 && !busy && !flip){ const d=acc>0?1:-1; acc=0; show(cur+d,d); }
+  },{passive:false});
+
+  // folded corners to grab
+  for(const side of ['l','r']){ const c=document.createElement('div'); c.className='corner '+side; c.title=side==='r'?'Drag to turn the page':'Drag back'; wrap.appendChild(c); }
+})();
+
+function update(){
+  wrap.querySelector('.corner.l')?.classList.toggle('off',cur===0);
+  wrap.querySelector('.corner.r')?.classList.toggle('off',cur===spreads.length-1);
+  document.getElementById('count').textContent=`Spread ${cur+1} / ${spreads.length} · ${SECTIONS[spreads[cur].dataset.sec]}`;
+  [...dots.children].forEach((d,k)=>{d.className=k<cur?'done':k===cur?'now':''});
+  navBtns.forEach((b,k)=>b.classList.toggle('on', book.style.display==='block' && +spreads[cur].dataset.sec===k));
+  document.getElementById('prev').disabled=cur===0;
+  document.getElementById('next').disabled=cur===spreads.length-1;
+  // the address is not rewritten on every turn, so a reload always starts at the machine.
+  // A link ending in #N (e.g. #8) still opens that spread directly.
+}
+function openBook(i){
+  if(flip){ flip.ov.remove(); flip=null; busy=false; }
+  home.style.display='none'; book.style.display='block'; window.scrollTo(0,0);
+  spreads.forEach(s=>s.classList.remove('active')); cur=i; spreads[i].classList.add('active'); update();
+}
+function goHome(){ book.style.display='none'; home.style.display='block'; navBtns.forEach(b=>b.classList.remove('on')); if(location.hash) history.replaceState(null,'',location.pathname); if(window.resetBall) resetBall(); }
+document.getElementById('prev').onclick=()=>show(cur-1,-1);
+document.getElementById('next').onclick=()=>show(cur+1,1);
+document.getElementById('toHome').onclick=goHome;
+document.querySelectorAll('[data-home]').forEach(b=>b.onclick=goHome);
+document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>show(+b.dataset.go,1));
+addEventListener('keydown',e=>{
+  if(book.style.display!=='block' || e.target.matches('input')) return;
+  if(e.key==='ArrowRight'||e.key==='PageDown') show(cur+1,1);
+  if(e.key==='ArrowLeft'||e.key==='PageUp') show(cur-1,-1);
+  if(e.key==='Escape') goHome();
+});
+
+/* ============================================================
+   TOGGLE BETWEEN OUTPUTS
+   ============================================================ */
+document.querySelectorAll('#tog1 button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#tog1 button').forEach(x=>x.classList.toggle('on',x===b));
+  const img=document.getElementById('tog1img'); img.src=b.dataset.src; img.alt=b.dataset.cap;
+  document.getElementById('tog1cap').textContent=b.dataset.cap;
+});
+
+/* ============================================================
+   FIGURE-GROUND STAGE MATRIX
+   c = core · p = pilot · - = not used. Roles are our proposal.
+   Row images: drop files named as in `img` into assets/ and they appear.
+   ============================================================ */
+(function(){
+  const grid=document.getElementById('pgrid'), panel=document.getElementById('mxpanel'); if(!grid) return;
+  const STAGES=['Competition','Concept','Schematic','Design dev.','Client pres.','Marketing'];
+  const WF=[
+    {n:'Text to image',   s:'cp---p', run:'Competition team',       learn:'1 workshop',            img:'mx_t2i.jpg',
+     why:'Fast mood and atmosphere options for competition boards. Never used as a design image.'},
+    {n:'Image to image',  s:'ccp-pc', run:'Visualization lead',     learn:'Shadowing on the pilot', img:'mx_i2i.jpg',
+     why:'Turns Rhino views into option renders in hours. Geometry holds; materials still need checking.'},
+    {n:'Custom LoRA',     s:'cp--pc', run:'AMO + visualization',    learn:'Our training notes',    img:'mx_lora.jpg',
+     why:'One trained house style across every render. Strength has to be picked by eye, per image.'},
+    {n:'Image to video',  s:'p---pc', run:'Media / AMO',            learn:'1 workshop',            vid:'video_flux3_blocks.mp4',
+     why:'Short motion pieces for marketing and client mood reels. Never a design-review walkthrough.'},
+    {n:'Agentic modeling',s:'pcp---', run:'Computational designer', learn:'Pilot + prompt log',    img:'mx_agent.jpg',
+     why:'Massing options checked against the brief in real time. Every output needs a human review.'},
+    {n:'Redline loop',    s:'-ccp--', run:'Project architect',      learn:'Review sessions',       img:'mx_redline.jpg',
+     why:'Red-line markups handed back to the agent. Keeps the architect in charge of every revision.'},
+  ];
+  const TYPE={c:'core',p:'pilot','-':'none'}, LABEL={c:'Core',p:'Pilot only','-':'Not used'};
+  const cells=[];
+
+  // header row
+  grid.appendChild(Object.assign(document.createElement('div'),{className:'hd',textContent:''}));
+  STAGES.forEach((st,j)=>{ const h=document.createElement('button'); h.className='hd'; h.textContent=st; h.onclick=()=>focusCol(j); grid.appendChild(h); });
+
+  WF.forEach((w,i)=>{
+    const rl=document.createElement('button'); rl.className='rl'; rl.setAttribute('aria-label',w.n);
+    if(w.vid){ const v=document.createElement('video'); Object.assign(v,{src:'assets/'+w.vid,muted:true,loop:true,autoplay:true,playsInline:true}); v.setAttribute('muted',''); v.setAttribute('aria-hidden','true'); rl.appendChild(v); }
+    else { const im=new Image(); im.alt=''; im.src='assets/'+w.img; im.onerror=()=>im.remove(); rl.appendChild(im); }
+    rl.appendChild(Object.assign(document.createElement('b'),{textContent:w.n}));
+    rl.onclick=()=>pickRow(i); grid.appendChild(rl); w.rl=rl;
+    [...w.s].forEach((k,j)=>{
+      const c=document.createElement('button'); c.className='pc '+TYPE[k]; c.dataset.r=i; c.dataset.c=j;
+      c.setAttribute('aria-label',`${w.n}, ${STAGES[j]}: ${LABEL[k]}`);
+      c.innerHTML=`<span class="fl"><span class="fr"><i>${k==='c'?'<s></s><s></s><s></s><s></s>':''}</i></span>
+        <span class="bk"><span><em>${STAGES[j]} · ${LABEL[k]}</em>${k==='-'?'Not used here':w.run}</span></span></span>`;
+      c.onclick=()=>{ c.classList.toggle('flip'); pickRow(i,true); };
+      grid.appendChild(c); cells.push(c);
+    });
+  });
+
+  function show(i){
+    const w=WF[i];
+    panel.innerHTML=`<span class="k">Workflow</span><h3>${w.n}</h3>
+      <div class="chips">${[...w.s].map((k,j)=>`<span class="${k==='c'?'c':k==='p'?'p':''}" title="${LABEL[k]}">${STAGES[j]}</span>`).join('')}</div>
+      <span class="k">Runs it (proposed)</span><div><b>${w.run}</b></div>
+      <span class="k">Learns it by</span><div>${w.learn}</div>
+      <span class="k">Why here</span><div>${w.why}</div>`;
+  }
+  function pickRow(i,quiet){
+    WF.forEach((w,k)=>w.rl.classList.toggle('on',k===i));
+    grid.classList.remove('focuscol'); grid.classList.add('focusrow');
+    cells.forEach(c=>c.classList.toggle('row',+c.dataset.r===i));
+    if(!quiet) cells.filter(c=>+c.dataset.r===i).forEach((c,k)=>{ c.classList.remove('slide','flip'); void c.offsetWidth; c.style.setProperty('--d',(k*0.07)+'s'); c.classList.add('slide'); });
+    show(i);
+  }
+  function focusCol(j){
+    grid.querySelectorAll('.hd').forEach((h,k)=>h.classList.toggle('on',k-1===j));
+    WF.forEach(w=>w.rl.classList.remove('on'));
+    grid.classList.remove('focusrow'); grid.classList.add('focuscol');
+    cells.forEach(c=>c.classList.toggle('col',+c.dataset.c===j));
+    const list=WF.map(w=>({n:w.n,k:w.s[j]})).filter(x=>x.k!=='-');
+    panel.innerHTML=`<span class="k">Stage</span><h3>${STAGES[j]}</h3>
+      ${list.length?list.map(x=>`<div><b>${x.n}</b> · ${LABEL[x.k]}</div>`).join(''):'<div>No AI workflow at this stage.</div>'}
+      <span class="k">Click a workflow to see who runs it</span>`;
+  }
+  // when the spread first opens, every block turns in, one after another
+  let played=false;
+  new IntersectionObserver(es=>es.forEach(e=>{ if(e.isIntersecting && !played){ played=true;
+    cells.forEach((c,k)=>{ c.style.setProperty('--d',(k*0.025)+'s'); c.classList.add('slide'); }); } }),{threshold:.3}).observe(grid);
+  show(1); WF[1].rl.classList.add('on');
+})();
+
+/* ============================================================
+   LORA STRENGTH SLIDER: one Rhino model, nine strengths
+   ============================================================ */
+document.querySelectorAll('.strength').forEach(S=>{
+  const imgs=[...S.querySelectorAll('.sframe img')], r=S.querySelector('input'), val=S.querySelector('.sval'), ticks=[...S.querySelectorAll('.sticks span')];
+  const set=i=>{ imgs.forEach((im,k)=>im.classList.toggle('on',k===i)); val.textContent=i===0?'Rhino input':'Strength '+imgs[i].dataset.l; ticks.forEach((t,k)=>t.classList.toggle('on',k===i)); };
+  r.addEventListener('input',()=>set(+r.value));
+  ticks.forEach((t,k)=>{ t.style.cursor='pointer'; t.onclick=()=>{ r.value=k; set(k); }; });
+  set(0);
+});
+
+/* ============================================================
+   DIAGRAM -> MODEL MORPH
+   frames 0-300; every 100 frames is one stage. Between stages the
+   images cross-fade with a blur and a slight push-in, like an
+   image-to-video interpolation.
+   ============================================================ */
+document.querySelectorAll('.morph').forEach(M=>{
+  const imgs=[...M.querySelectorAll('.mframe img')], range=M.querySelector('input'), play=M.querySelector('.mplay');
+  const stages=[...M.querySelectorAll('.mstages button')], tc=M.querySelector('.mtc'), frame=M.querySelector('.mframe');
+  const MAX=300; let f=0, raf=null;
+
+  /* ---- 3D program blocks ----------------------------------------
+     b = [x0,y0,z0, x1,y1,z1] in block units (the building is 3 x 3 x 2).
+     off/rot = where each block starts: pushed out and twisted.          */
+  const BOXES=[
+    {n:'Retail',      c:'#e46fc0', b:[0,0,0,3,1,2], off:[0,-0.9,0.6],   rot:[0,-80,0]},
+    {n:'Office',      c:'#bfe3ef', b:[0,1,0,1,3,2], off:[-1.3,0.2,0.4], rot:[35,0,-50]},
+    {n:'Hotel',       c:'#f2a12c', b:[2,1,0,3,2,2], off:[1.3,-0.2,0.5], rot:[0,100,30]},
+    {n:'Residential', c:'#f3e64a', b:[1,2,0,3,3,2], off:[0.3,0.9,-0.4], rot:[-40,70,0]},
+    {n:'Culture',     c:'#a8cf3a', b:[1,1,0,2,2,2], off:[0,0,1.8],      rot:[50,50,0], voids:true},
+  ];
+  const scene=M.querySelector('.scene');
+  const ease=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2, cl=t=>Math.max(0,Math.min(1,t)), mix=(a,b,t)=>a+(b-a)*t;
+  let U=40;
+  function build(){
+    U=frame.clientHeight/6; scene.innerHTML='';
+    BOXES.forEach(B=>{
+      const [x0,y0,z0,x1,y1,z1]=B.b, w=(x1-x0)*U, h=(y1-y0)*U, d=(z1-z0)*U;
+      const el=document.createElement('div'); el.className='box';
+      const faces=[ // [width,height,transform,shade,label?]
+        [w,h,`translateZ(${d/2}px)`,'',true],[w,h,`rotateY(180deg) translateZ(${d/2}px)`,'s2',false],
+        [d,h,`rotateY(90deg) translateZ(${w/2}px)`,'s1',true],[d,h,`rotateY(-90deg) translateZ(${w/2}px)`,'s2',false],
+        [w,d,`rotateX(90deg) translateZ(${h/2}px)`,'top',false],[w,d,`rotateX(-90deg) translateZ(${h/2}px)`,'s2',false]];
+      faces.forEach(([fw,fh,tr,sh,lab])=>{
+        const fc=document.createElement('div'); fc.className='bf '+sh;
+        Object.assign(fc.style,{width:fw+'px',height:fh+'px',left:-fw/2+'px',top:-fh/2+'px',transform:tr,background:B.c});
+        if(lab){ const t=document.createElement('b'); t.textContent=B.n; t.style.fontSize=Math.min(U*.34, fw/(B.n.length*.62), fh*.6)+'px'; fc.appendChild(t); }
+        fc.appendChild(document.createElement('i')); el.appendChild(fc);
+      });
+      B.el=el; scene.appendChild(el);
+    });
+    render(f);
+  }
+  function renderBlocks(){
+    if(!BOXES[0].el) return;                       // not built yet (spread hidden)
+    // 0-75: blocks twist and slot in (staggered) · 70-100: they turn white, the void pulls out
+    const wht=ease(cl((f-70)/30)), view=ease(cl((f-40)/60));
+    scene.style.transform=`rotateX(${mix(-24,-10,view)}deg) rotateY(${mix(-38+(1-ease(cl(f/75)))*-50,-22,view)}deg)`;
+    BOXES.forEach((B,i)=>{
+      const a=ease(cl((f-i*8)/42)), [x0,y0,z0,x1,y1,z1]=B.b;
+      let cx=((x0+x1)/2-1.5+B.off[0]*(1-a))*U, cy=-((y0+y1)/2-1.5+B.off[1]*(1-a))*U, cz=((z0+z1)/2-1+B.off[2]*(1-a))*U;
+      let sc=1, op=1;
+      if(B.voids){ const out=ease(cl((f-75)/25)); cz+=out*3*U; op=1-out; sc=1-out*.4; }
+      B.el.style.transform=`translate3d(${cx}px,${cy}px,${cz}px) rotateX(${B.rot[0]*(1-a)}deg) rotateY(${B.rot[1]*(1-a)}deg) rotateZ(${B.rot[2]*(1-a)}deg) scale(${sc})`;
+      B.el.style.opacity=op; B.el.style.setProperty('--w',wht.toFixed(3));
+      B.el.querySelectorAll('b').forEach(t=>t.style.opacity=(1-wht).toFixed(3));
+    });
+  }
+  new ResizeObserver(()=>build()).observe(frame);
+
+  function render(v){
+    f=Math.max(0,Math.min(MAX,v)); range.value=f;
+    const pos=f/100;
+    renderBlocks();
+    // photos dissolve in over the blocks: massing 100-150, model 150-200, context 200-300
+    const win=[[100,150],[150,200],[200,300]];
+    imgs.forEach((im,k)=>{
+      const [s,e]=win[k], t=cl((f-s)/(e-s)), o=t*t*(3-2*t), blur=Math.sin(Math.PI*t)*5;
+      im.style.opacity=o; im.style.filter=blur>0.05?`blur(${blur.toFixed(2)}px)`:'none'; im.style.transform=`scale(${(1.04-0.04*o).toFixed(4)})`;
+    });
+    const secs=f/60; tc.textContent='00:'+String(Math.floor(secs)).padStart(2,'0')+':'+String(Math.floor((secs%1)*24)).padStart(2,'0');
+    stages.forEach((b,k)=>b.classList.toggle('on',Math.round(pos)===k));
+  }
+  function stop(){ cancelAnimationFrame(raf); raf=null; play.textContent='▶'; play.setAttribute('aria-label','Play sequence'); }
+  function go(to, ms){ stop(); const f0=f, t0=performance.now(); play.textContent='❚❚'; play.setAttribute('aria-label','Pause');
+    (function step(now){ const k=Math.min(1,(now-t0)/ms); render(f0+(to-f0)*k); if(k<1) raf=requestAnimationFrame(step); else stop(); })(t0); }
+  play.onclick=()=>{ if(raf) return stop(); if(f>=MAX) render(0); go(MAX, (MAX-f)/MAX*5000); };
+  range.addEventListener('input',()=>{ stop(); render(+range.value); });
+  stages.forEach(b=>b.onclick=()=>go(+b.dataset.f, 700));
+  // scrub by dragging across the picture
+  let drag=false;
+  frame.addEventListener('pointerdown',e=>{drag=true; stop(); frame.setPointerCapture(e.pointerId);});
+  frame.addEventListener('pointermove',e=>{ if(!drag) return; const r=frame.getBoundingClientRect(); render((e.clientX-r.left)/r.width*MAX); });
+  frame.addEventListener('pointerup',()=>drag=false);
+  M.addEventListener('keydown',e=>{
+    if(e.target!==M) return;
+    if(e.key==='ArrowRight'){ go(Math.min(MAX,Math.floor(f/100)*100+100),600); }
+    else if(e.key==='ArrowLeft'){ go(Math.max(0,Math.ceil(f/100)*100-100),600); }
+    else if(e.key===' '||e.key==='Enter'){ play.click(); } else return;
+    e.preventDefault(); e.stopPropagation();
+  });
+  render(0);
+});
+
+/* ============================================================
+   LENS REVEAL (look through the Rhino model at the AI render)
+   - mouse: the lens follows the pointer; touch: drag it
+   - double-click / Enter: reveal the whole render, again to close
+   ============================================================ */
+document.querySelectorAll('.lens').forEach(L=>{
+  let x=50,y=50,all=false,drag=false;
+  const frac=L.classList.contains('wide')?0.22:0.42;  // lens radius as a share of the frame width
+  const set=()=>{ const w=L.clientWidth||400, h=L.clientHeight||300;
+    L.style.setProperty('--x',x+'%'); L.style.setProperty('--y',y+'%');
+    L.style.setProperty('--rp',(all?Math.hypot(w,h):w*frac)+'px'); L.classList.toggle('all',all); };
+  addEventListener('resize',set);
+  new ResizeObserver(set).observe(L);
+  const at=e=>{const r=L.getBoundingClientRect(); x=Math.max(0,Math.min(100,(e.clientX-r.left)/r.width*100)); y=Math.max(0,Math.min(100,(e.clientY-r.top)/r.height*100)); set();};
+  L.addEventListener('pointermove',e=>{ if(e.pointerType==='mouse'||drag){ L.classList.add('dragging'); at(e);} });
+  L.addEventListener('pointerdown',e=>{drag=true; L.setPointerCapture(e.pointerId); at(e);});
+  L.addEventListener('pointerup',()=>{drag=false;});
+  L.addEventListener('pointerleave',()=>L.classList.remove('dragging'));
+  L.addEventListener('dblclick',()=>{all=!all; L.classList.remove('dragging'); set();});
+  L.addEventListener('keydown',e=>{
+    const s=5, k=e.key;
+    if(k==='ArrowLeft')x-=s; else if(k==='ArrowRight')x+=s; else if(k==='ArrowUp')y-=s; else if(k==='ArrowDown')y+=s;
+    else if(k==='Enter'||k===' '){all=!all;} else return;
+    e.preventDefault(); e.stopPropagation(); x=Math.max(0,Math.min(100,x)); y=Math.max(0,Math.min(100,y)); L.classList.remove('dragging'); set();
+  });
+  set();
+});
+
+/* ============================================================
+   COST CALCULATOR
+   ============================================================ */
+(function(){
+  let mode='cloud';
+  const $=id=>+document.getElementById(id).value||0;
+  const fmt=n=>'$'+Math.round(n).toLocaleString('en-US');
+  document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{
+    mode=b.dataset.mode; document.querySelectorAll('.seg button').forEach(x=>x.classList.toggle('on',x===b));
+    document.querySelectorAll('.calc .cl').forEach(l=>l.style.display=mode==='cloud'?'grid':'none');
+    document.querySelectorAll('.calc .lo').forEach(l=>l.style.display=mode==='local'?'grid':'none');
+    calc();
+  });
+  function calc(){
+    const subs=$('c_seats')*$('c_sub')*12;
+    const compute= mode==='cloud' ? $('c_gpuh')*$('c_gpur')*12 : $('c_ws')*$('c_wsn');
+    const training=$('c_seats')*$('c_th')*$('c_rate');
+    const total=subs+compute+training;
+    document.getElementById('c_total').textContent=fmt(total);
+    document.getElementById('c_note').textContent = mode==='cloud'
+      ? 'Subscriptions + 12 months of cloud GPU + training time.'
+      : 'Subscriptions + workstation purchase (year one) + training time.';
+    const rows=[['Subscriptions',subs],[mode==='cloud'?'Cloud GPU':'Hardware',compute],['Training time',training]];
+    const max=Math.max(1,...rows.map(r=>r[1]));
+    document.getElementById('c_bars').innerHTML=rows.map(([k,v])=>`<div><span>${k}</span><i style="width:${v/max*100}%"></i><b>${fmt(v)}</b></div>`).join('');
+  }
+  document.querySelectorAll('.calc input').forEach(i=>i.addEventListener('input',calc));
+  calc();
+})();
+
+/* ============================================================
+   THE MACHINE (Matter.js physics, drawn by hand on a canvas)
+   ============================================================ */
+const W=1200, H=700;
+const canvas=document.getElementById('machine'), ctx=canvas.getContext('2d');
+const toast=document.getElementById('toast');
+const BIN_X0=240, BIN_W=192, LEDGE_Y=232, BALL_R=16, BALL_HOME={x:205,y:LEDGE_Y-8-BALL_R};
+let stuck=0, engine, ball, crossA, crossB, dominoes=[], landed=-1, launchedAt=0, power=0, charging=false, chargeT=0, gloveX=0, gloveAnim=0;
+const meter=document.getElementById('meter'); for(let i=0;i<14;i++) meter.appendChild(document.createElement('i'));
+
+function fit(){
+  const cw=canvas.parentElement.clientWidth, dpr=Math.min(2,devicePixelRatio||1);
+  canvas.width=cw*dpr; canvas.height=cw*H/W*dpr; canvas.style.height=(cw*H/W)+'px';
+  ctx.setTransform(dpr*cw/W,0,0,dpr*cw/W,0,0);
+}
+addEventListener('resize',fit); fit();
+
+function say(t,ms=1800){toast.textContent=t; toast.classList.add('show'); clearTimeout(say.t); say.t=setTimeout(()=>toast.classList.remove('show'),ms);}
+
+if(!window.Matter){
+  say('Physics failed to load. Use the chapter buttons below.',6000);
+  document.getElementById('punch').disabled=true;
+} else {
+  const {Engine,Bodies,Body,Composite,Events}=Matter;
+  engine=Engine.create(); engine.gravity.y=1;
+  const S=(x,y,w,h,o={})=>Bodies.rectangle(x,y,w,h,Object.assign({isStatic:true,kind:'wall',friction:.02},o));
+  const world=engine.world;
+
+  // frame
+  Composite.add(world,[ S(W/2,H+10,W+40,40), S(-10,H/2,20,H*2), S(W+10,H/2,20,H*2), S(W/2,-200,W+40,20) ]);
+  // ledge (brick block like the reference) + launch rail
+  Composite.add(world, S(140,LEDGE_Y,240,16,{kind:'ledge'}));
+  // feeder ramp under the ledge -> bin 1
+  Composite.add(world, S(118,498,262,14,{angle:Math.atan2(118,230),kind:'ramp'}));
+  // bin dividers + sensors
+  for(let i=0;i<=5;i++){
+    const x=BIN_X0+i*BIN_W, top=i===0?585:560;
+    Composite.add(world, S(x,(top+H)/2,8,H-top,{kind:'divider'}));
+  }
+  for(let i=0;i<5;i++){
+    Composite.add(world, Bodies.rectangle(BIN_X0+i*BIN_W+BIN_W/2,H-14,BIN_W-24,22,{isStatic:true,isSensor:true,kind:'sensor',bin:i}));
+  }
+  // pegs (two staggered rows)
+  for(let r=0;r<2;r++) for(let x=380+r*45;x<1170;x+=90){
+    Composite.add(world, Bodies.circle(x,330+r*62,7,{isStatic:true,kind:'peg',restitution:.5}));
+  }
+  // striped bumpers (from the plaza reference): circles along an arc
+  const arc=(cx,cy,R,a0,a1,n)=>{const parts=[];for(let k=0;k<n;k++){const a=a0+(a1-a0)*k/(n-1);parts.push(Bodies.circle(cx+R*Math.cos(a),cy+R*Math.sin(a),11,{isStatic:true,kind:'bump',seg:k,restitution:.7}));}return parts;};
+  Composite.add(world, arc(560,505,62,Math.PI,2*Math.PI,11));
+  Composite.add(world, arc(1000,470,46,Math.PI,2*Math.PI,9));
+  // rotating cross (the "windmill" / pulley moment)
+  crossA=S(760,190,130,10,{kind:'cross'}); crossB=S(760,190,10,130,{kind:'cross'});
+  Composite.add(world,[crossA,crossB]);
+
+  ball=Bodies.circle(BALL_HOME.x,BALL_HOME.y,BALL_R,{kind:'ball',restitution:.35,friction:.01,frictionAir:.004,density:.004});
+  Body.setStatic(ball,true); // made static after creation so Matter keeps its real mass for launch
+  Composite.add(world,ball);
+  buildDominoes();
+
+  Events.on(engine,'collisionStart',ev=>{
+    for(const p of ev.pairs){
+      const a=p.bodyA,b=p.bodyB, other=a===ball?b:b===ball?a:null;
+      if(other && other.kind==='sensor' && landed<0){
+        landed=other.bin; say('→ '+String(landed+1).padStart(2,'0')+' '+SECTIONS[landed],1500);
+        const go=landed; setTimeout(()=>{ if(landed===go) openBook(secStart[go]); },1600);
+      }
+    }
+  });
+
+  function buildDominoes(){
+    dominoes.forEach(d=>Composite.remove(world,d)); dominoes=[];
+    for(let i=0;i<5;i++) for(let k=0;k<4;k++){
+      const d=Bodies.rectangle(BIN_X0+i*BIN_W+46+k*30,H-27,10,54,{kind:'domino',density:.0015,friction:.4,bin:i});
+      dominoes.push(d);
+    }
+    Composite.add(world,dominoes);
+  }
+  window.resetBall=function(){
+    if(!ball.isStatic) Body.setStatic(ball,true); Body.setPosition(ball,BALL_HOME); Body.setVelocity(ball,{x:0,y:0}); Body.setAngularVelocity(ball,0);
+    landed=-1; launchedAt=0; buildDominoes();
+  };
+  function fire(p){
+    if(launchedAt && landed<0) return;
+    if(landed>=0) resetBall();
+    gloveAnim=1;
+    setTimeout(()=>{
+      Body.setStatic(ball,false);
+      Body.setVelocity(ball,{x:3+p*19, y:-2-p*9});
+      launchedAt=performance.now();
+    },90);
+  }
+
+  window.__fire=fire; window.__landed=()=>landed;
+  // input: hold to charge, release to punch
+  const btn=document.getElementById('punch');
+  const start=e=>{ if(e) e.preventDefault(); if(charging) return; if(launchedAt&&landed<0) return; charging=true; chargeT=performance.now(); };
+  const end=()=>{ if(!charging) return; charging=false; fire(power); };
+  btn.addEventListener('pointerdown',start); addEventListener('pointerup',end); btn.addEventListener('pointercancel',()=>{charging=false});
+  btn.addEventListener('keydown',e=>{ if(e.key===' '||e.key==='Enter'){ e.preventDefault(); if(!e.repeat) start(); } });
+  btn.addEventListener('keyup',e=>{ if(e.key===' '||e.key==='Enter') end(); });
+  addEventListener('keydown',e=>{ if(home.style.display!=='none' && e.key===' ' && e.target===document.body){ e.preventDefault(); if(!e.repeat) start(); }});
+  addEventListener('keyup',e=>{ if(home.style.display!=='none' && e.key===' ' && e.target===document.body) end(); });
+  canvas.addEventListener('pointerdown',e=>{ start(e); });
+
+  // loop
+  let last=performance.now();
+  (function tick(now){
+    const dt=Math.max(8,Math.min(32,now-last)); last=now;
+    if(home.style.display!=='none'){
+      Body.setAngle(crossA,crossA.angle+0.018); Body.setAngle(crossB,crossB.angle+0.018);
+      Engine.update(engine,1000/60);
+      if(charging){ const t=(now-chargeT)/1100; power=1-Math.abs(1-(t%2)); }
+      if(gloveAnim>0) gloveAnim=Math.max(0,gloveAnim-dt/260);
+      // anti-stuck: if the ball rests on a peg or bumper, give it a small push
+      if(launchedAt && landed<0 && !ball.isStatic && ball.speed<0.15 && ball.position.y<640){
+        stuck=(stuck||0)+1; if(stuck>40){ Body.setVelocity(ball,{x:(Math.random()<.5?-1:1)*2.5,y:-1.5}); stuck=0; }
+      } else stuck=0;
+      if(launchedAt && landed<0 && (now-launchedAt>9000 || ball.position.y>H+60)){ say('Missed. Try again.'); resetBall(); }
+      [...meter.children].forEach((m,k)=>{m.classList.toggle('on',k<Math.round(power*14)); m.style.height=(8+k*1.8)+'px';});
+      draw(now);
+    }
+    requestAnimationFrame(tick);
+  })(last);
+}
+
+/* ---------- drawing ---------- */
+function poly(b){ctx.beginPath(); b.vertices.forEach((v,i)=>i?ctx.lineTo(v.x,v.y):ctx.moveTo(v.x,v.y)); ctx.closePath();}
+function draw(now){
+  ctx.clearRect(0,0,W,H);
+  const bodies=Matter.Composite.allBodies(engine.world);
+
+  // bins: labels + bulbs (the light-bulb ending of the reference)
+  ctx.textAlign='center';
+  for(let i=0;i<5;i++){
+    const cx=BIN_X0+i*BIN_W+BIN_W/2;
+    const lit=landed===i;
+    ctx.fillStyle=lit?'#e4002b':'#0b0b0b';
+    ctx.font='900 14px Helvetica Neue,Helvetica,Arial';
+    ctx.fillText(String(i+1).padStart(2,'0'),cx,548);
+    ctx.font='700 13px Helvetica Neue,Helvetica,Arial';
+    ctx.fillText(SECTIONS[i].toUpperCase(),cx,566);
+    // bulb on a cord
+    ctx.strokeStyle='#0b0b0b'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(cx,486); ctx.lineTo(cx,508); ctx.stroke();
+    if(lit){ctx.fillStyle='#e4002b33'; ctx.beginPath(); ctx.arc(cx,518,26+4*Math.sin(now/90),0,7); ctx.fill();}
+    ctx.fillStyle=lit?'#e4002b':'#fff'; ctx.beginPath(); ctx.arc(cx,518,10,0,7); ctx.fill(); ctx.stroke();
+  }
+
+  for(const b of bodies){
+    if(b.kind==='sensor') continue;
+    if(b.kind==='ball') continue;
+    if(b.kind==='bump'){ ctx.fillStyle=b.seg%2?'#fff':'#0b0b0b'; ctx.strokeStyle='#0b0b0b'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(b.position.x,b.position.y,11,0,7); ctx.fill(); ctx.stroke(); continue; }
+    if(b.kind==='peg'){ ctx.fillStyle='#0b0b0b'; ctx.beginPath(); ctx.arc(b.position.x,b.position.y,7,0,7); ctx.fill(); continue; }
+    poly(b);
+    if(b.kind==='domino'){ ctx.fillStyle=landed===b.bin?'#e4002b':'#0b0b0b'; ctx.fill(); ctx.strokeStyle='#fff'; ctx.lineWidth=1; ctx.stroke(); }
+    else if(b.kind==='ledge'){ ctx.fillStyle='#0b0b0b'; ctx.fill(); }
+    else if(b.kind==='ramp'){ ctx.fillStyle='#fff'; ctx.fill(); ctx.strokeStyle='#0b0b0b'; ctx.lineWidth=2; ctx.stroke(); }
+    else if(b.kind==='cross'){ ctx.fillStyle='#fff'; ctx.fill(); ctx.strokeStyle='#0b0b0b'; ctx.lineWidth=2; ctx.stroke(); }
+    else { ctx.fillStyle='#0b0b0b'; ctx.fill(); }
+  }
+  // pulley hub on the cross + rope to the ceiling
+  ctx.strokeStyle='#0b0b0b'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(760,0); ctx.lineTo(760,190); ctx.stroke();
+  ctx.fillStyle='#e4002b'; ctx.beginPath(); ctx.arc(760,190,9,0,7); ctx.fill();
+
+  // brick block under the ledge
+  ctx.strokeStyle='#0b0b0b'; ctx.lineWidth=1;
+  for(let y=LEDGE_Y+8;y<LEDGE_Y+80;y+=14){ctx.beginPath();ctx.moveTo(20,y);ctx.lineTo(260,y);ctx.stroke();
+    for(let x=20+((y/14)%2)*20;x<260;x+=40){ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x,y+14);ctx.stroke();}}
+
+  // boxing glove on a scissor arm
+  const pull = charging ? 40*power : 0;
+  const punch = gloveAnim>0 ? Math.sin(gloveAnim*Math.PI)*34 : 0;
+  const gx = BALL_HOME.x - BALL_R - 34 - pull + punch, gy=BALL_HOME.y;
+  ctx.strokeStyle='#0b0b0b'; ctx.lineWidth=2; ctx.beginPath();
+  const x0=20, n=4, seg=(gx-24-x0)/n;
+  for(let k=0;k<=n;k++){ const x=x0+k*seg, up=k%2?-12:12; k?ctx.lineTo(x,gy+up):ctx.moveTo(x,gy+up); }
+  for(let k=n;k>=0;k--){ const x=x0+k*seg, up=k%2?12:-12; ctx.lineTo(x,gy+up); }
+  ctx.stroke();
+  ctx.fillStyle='#e4002b';
+  ctx.beginPath(); ctx.roundRect(gx-26,gy-17,46,34,[6,17,17,6]); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(gx-12,gy-26,24,16,8); ctx.fill();
+  ctx.fillStyle='#fff'; ctx.fillRect(gx-30,gy-12,6,24);
+
+  // ball
+  if(ball){ ctx.fillStyle='#e4002b'; ctx.beginPath(); ctx.arc(ball.position.x,ball.position.y,BALL_R,0,7); ctx.fill();
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(ball.position.x-5,ball.position.y-6,3.5,0,7); ctx.fill(); }
+
+  // title tag
+  ctx.textAlign='left'; ctx.fillStyle='#0b0b0b'; ctx.font='900 13px Helvetica Neue,Helvetica,Arial';
+  ctx.fillText('ELEMENTS OF THE PLAN: A MACHINE IN FIVE BOXES',24,34);
+}
+
+/* deep link: #N opens spread N */
+function fromHash(){ const h=parseInt(location.hash.slice(1)); if(h>=1 && h<=spreads.length && !(book.style.display==='block' && cur===h-1)) openBook(h-1); }
+addEventListener('hashchange',fromHash); fromHash();
+</script>
+</body>
+</html>
